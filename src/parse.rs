@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     ast::{
         Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, Literal, Stmt, Unary, UnaryOp,
@@ -181,7 +183,7 @@ impl Parser {
 
         let body = self.block()?;
 
-        Ok(Stmt::Function(Function { name, params, body }))
+        Ok(Stmt::Function(Arc::new(Function { name, params, body })))
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>, Error> {

@@ -1,11 +1,11 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use crate::token::TokenType;
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Expr(Expr),
-    Function(Function),
+    Function(Arc<Function>),
     Print(Expr),
     VarDecl(VarDecl),
     Block(Vec<Stmt>),

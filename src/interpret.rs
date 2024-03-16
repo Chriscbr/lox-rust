@@ -55,9 +55,8 @@ impl Interpreter {
         }
     }
 
-    fn execute_function_decl(&mut self, fun: &Function) -> Result<(), RuntimeError> {
-        let arc = Arc::new(fun.clone()); // unfortunate clone
-        let value = RuntimeValue::Callable(Callable::new(fun.params.len(), arc));
+    fn execute_function_decl(&mut self, fun: &Arc<Function>) -> Result<(), RuntimeError> {
+        let value = RuntimeValue::Callable(Callable::new(fun.params.len(), fun.clone()));
         self.env.define(&fun.name, value);
         Ok(())
     }
@@ -170,6 +169,7 @@ impl Interpreter {
 
         match callee {
             RuntimeValue::Callable(f) => {
+                // TODO: support native functions?
                 if args.len() != f.arity {
                     return Err(RuntimeError::InvalidArgumentCount);
                 }
@@ -179,12 +179,12 @@ impl Interpreter {
                     env.define(param, arg);
                 }
 
-                let previous = std::mem::replace(&mut self.env, env);
+                let previous = self.set_current_env(env);
                 let result = self.execute_block(&f.fun.body, self.env.clone());
-                self.env = previous;
+                self.set_current_env(previous);
 
                 result?;
-                Ok(RuntimeValue::Nil) // TODO: support return statements
+                Ok(RuntimeValue::Nil) // TODO: support return statements?
             }
             _ => Err(RuntimeError::NotCallable),
         }
@@ -241,6 +241,10 @@ impl Interpreter {
             (RuntimeValue::Bool(l), RuntimeValue::Bool(r)) => l == r,
             _ => false,
         }
+    }
+
+    fn set_current_env(&mut self, env: Environment) -> Environment {
+        std::mem::replace(&mut self.env, env)
     }
 }
 

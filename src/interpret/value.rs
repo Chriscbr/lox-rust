@@ -16,7 +16,7 @@ pub enum RuntimeValue {
 #[derive(Debug, Clone)]
 pub struct Callable {
     pub arity: usize,
-    pub fun: Arc<Function>, // Stmt::Function
+    pub fun: Arc<Function>,
 }
 
 impl Callable {
