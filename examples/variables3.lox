@@ -1,0 +1,2 @@
+print a; // runtime error: a is not defined
+var a = "too late!";

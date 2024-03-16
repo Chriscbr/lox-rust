@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp},
+    ast::{Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp, VarDecl, Variable},
     error::Error,
     token::{Token, TokenType},
 };
@@ -7,18 +7,29 @@ use crate::{
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
+    errors: Vec<Error>,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, current: 0 }
+        Self {
+            tokens,
+            current: 0,
+            errors: vec![],
+        }
     }
 
     pub fn parse(&mut self) -> Result<Vec<Stmt>, Error> {
         let mut stmts = vec![];
         while !self.is_at_end() {
-            let stmt = self.stmt()?;
-            stmts.push(stmt);
+            let stmt = self.declaration();
+            match stmt {
+                Ok(stmt) => stmts.push(stmt),
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize();
+                }
+            }
         }
 
         Ok(stmts)
@@ -26,6 +37,14 @@ impl Parser {
 
     fn expr(&mut self) -> Result<Expr, Error> {
         self.equality()
+    }
+
+    fn declaration(&mut self) -> Result<Stmt, Error> {
+        if self.matches(&[TokenType::Var]) {
+            return self.var_declaration();
+        }
+
+        self.stmt()
     }
 
     fn stmt(&mut self) -> Result<Stmt, Error> {
@@ -45,6 +64,28 @@ impl Parser {
         }
         self.advance();
         Ok(Stmt::Print(expr))
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt, Error> {
+        if !self.check(TokenType::Identifier) {
+            return Err(Error::ExpectedVariableName {
+                token: self.peek().clone(),
+            });
+        }
+        let name = self.advance().lexeme.clone();
+        let initializer = if self.matches(&[TokenType::Equal]) {
+            Some(self.expr()?)
+        } else {
+            None
+        };
+
+        if !self.check(TokenType::Semicolon) {
+            return Err(Error::ExpectSemicolonAfterExpression {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+        Ok(Stmt::VarDecl(VarDecl { name, initializer }))
     }
 
     fn expr_stmt(&mut self) -> Result<Stmt, Error> {
@@ -165,6 +206,12 @@ impl Parser {
             return Ok(Expr::Literal(Literal::String(trimmed.to_string())));
         }
 
+        if self.matches(&[TokenType::Identifier]) {
+            return Ok(Expr::Variable(Variable {
+                name: self.previous().lexeme.clone(),
+            }));
+        }
+
         if self.matches(&[TokenType::LeftParen]) {
             let expr = self.expr()?;
             if !self.check(TokenType::RightParen) {
@@ -218,5 +265,27 @@ impl Parser {
 
     fn previous(&self) -> &Token {
         &self.tokens[self.current - 1]
+    }
+
+    fn synchronize(&mut self) {
+        while !self.is_at_end() {
+            if self.previous().ty == TokenType::Semicolon {
+                return;
+            }
+
+            match self.peek().ty {
+                TokenType::Class
+                | TokenType::Fun
+                | TokenType::Var
+                | TokenType::For
+                | TokenType::If
+                | TokenType::While
+                | TokenType::Print
+                | TokenType::Return => return,
+                _ => {}
+            }
+
+            self.advance();
+        }
     }
 }

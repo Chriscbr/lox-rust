@@ -8,6 +8,7 @@ pub enum Error {
     UnterminatedString { line: usize },
     ExpectRightParenAfterExpr { token: Token },
     ExpectSemicolonAfterExpression { token: Token },
+    ExpectedVariableName { token: Token },
 }
 
 pub fn report_errors(errors: &[Error]) {
@@ -37,6 +38,16 @@ pub fn report_errors(errors: &[Error]) {
                 _ => println!(
                     "[line {}] Error at '{}': Expected ';' after expression.",
                     token.line, token.lexeme,
+                ),
+            },
+            Error::ExpectedVariableName { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected variable name.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected variable name.",
+                    token.line, token.lexeme
                 ),
             },
         }

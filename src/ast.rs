@@ -6,6 +6,7 @@ use crate::token::TokenType;
 pub enum Stmt {
     Expr(Expr),
     Print(Expr),
+    VarDecl(VarDecl),
 }
 
 impl Display for Stmt {
@@ -13,6 +14,23 @@ impl Display for Stmt {
         let s = match self {
             Stmt::Expr(e) => format!("{};", e),
             Stmt::Print(e) => format!("print {};", e),
+            Stmt::VarDecl(v) => format!("{}", v),
+        };
+        write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug)]
+pub struct VarDecl {
+    pub name: String,
+    pub initializer: Option<Expr>,
+}
+
+impl Display for VarDecl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match &self.initializer {
+            Some(e) => format!("var {} = {};", self.name, e),
+            None => format!("var {};", self.name),
         };
         write!(f, "{}", s)
     }
@@ -24,6 +42,7 @@ pub enum Expr {
     Grouping(Grouping),
     Literal(Literal),
     Unary(Unary),
+    Variable(Variable),
 }
 
 impl Display for Expr {
@@ -33,6 +52,7 @@ impl Display for Expr {
             Expr::Grouping(g) => format!("{}", g),
             Expr::Literal(l) => format!("{}", l),
             Expr::Unary(u) => format!("{}", u),
+            Expr::Variable(v) => format!("{}", v),
         };
         write!(f, "{}", s)
     }
@@ -91,6 +111,17 @@ pub struct Unary {
 impl Display for Unary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", self.op, self.right)
+    }
+}
+
+#[derive(Debug)]
+pub struct Variable {
+    pub name: String,
+}
+
+impl Display for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 

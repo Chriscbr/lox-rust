@@ -1,56 +1,46 @@
-use std::fmt::Display;
+mod env;
+mod value;
 
-use crate::ast::{Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp};
+use crate::ast::{Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp, Variable};
 
-pub enum RuntimeValue {
-    Nil,
-    Bool(bool),
-    Number(f64),
-    String(String),
+use self::{env::Environment, value::RuntimeValue};
+
+pub struct Interpreter {
+    env: Environment,
 }
-
-impl Display for RuntimeValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            RuntimeValue::Nil => format!("nil"),
-            RuntimeValue::Bool(b) => format!("{}", b),
-            RuntimeValue::Number(n) => {
-                let text = format!("{}", n);
-                if text.ends_with(".0") {
-                    text[..text.len() - 2].to_string()
-                } else {
-                    text
-                }
-            }
-            RuntimeValue::String(s) => format!("{}", s),
-        };
-        write!(f, "{}", s)
-    }
-}
-
-pub struct Interpreter {}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn interpret(&self, stmts: &[Stmt]) {
-        for stmt in stmts {
-            self.execute(stmt);
+        Self {
+            env: Environment::new(),
         }
     }
 
-    fn execute(&self, stmt: &Stmt) {
+    pub fn interpret(&mut self, stmts: &[Stmt]) -> Result<(), RuntimeError> {
+        for stmt in stmts {
+            self.execute(stmt)?;
+        }
+        Ok(())
+    }
+
+    fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
             Stmt::Print(expr) => {
-                let value = self.expr(expr).unwrap();
+                let value = self.expr(expr)?;
                 println!("{}", value);
             }
             Stmt::Expr(expr) => {
-                self.expr(expr).unwrap();
+                self.expr(expr)?;
+            }
+            Stmt::VarDecl(var_decl) => {
+                let value = match &var_decl.initializer {
+                    Some(expr) => self.expr(expr)?,
+                    None => RuntimeValue::Nil,
+                };
+                self.env.define(&var_decl.name, value);
             }
         }
+        Ok(())
     }
 
     pub fn expr(&self, expr: &Expr) -> Result<RuntimeValue, RuntimeError> {
@@ -59,6 +49,7 @@ impl Interpreter {
             Expr::Grouping(g) => self.grouping(g),
             Expr::Literal(l) => self.literal(l),
             Expr::Unary(u) => self.unary(u),
+            Expr::Variable(v) => self.variable(v),
         }
     }
 
@@ -144,6 +135,10 @@ impl Interpreter {
         }
     }
 
+    fn variable(&self, variable: &Variable) -> Result<RuntimeValue, RuntimeError> {
+        self.env.get(&variable.name)
+    }
+
     fn is_truthy(&self, value: &RuntimeValue) -> bool {
         match value {
             RuntimeValue::Nil => false,
@@ -168,4 +163,18 @@ pub enum RuntimeError {
     OperandsMustBeNumbers,
     OperandsMustBeTwoNumbersOrTwoStrings,
     OperandMustBeNumber,
+    UndefinedVariable(String),
+}
+
+impl std::fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RuntimeError::OperandsMustBeNumbers => write!(f, "Operands must be numbers"),
+            RuntimeError::OperandsMustBeTwoNumbersOrTwoStrings => {
+                write!(f, "Operands must be two numbers or two strings")
+            }
+            RuntimeError::OperandMustBeNumber => write!(f, "Operand must be a number"),
+            RuntimeError::UndefinedVariable(name) => write!(f, "Undefined variable '{}'", name),
+        }
+    }
 }

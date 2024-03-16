@@ -41,8 +41,10 @@ fn run(source: String) {
         }
     };
 
-    let interpreter = Interpreter::new();
-    interpreter.interpret(&stmts);
+    let mut interpreter = Interpreter::new();
+    if let Err(err) = interpreter.interpret(&stmts) {
+        println!("{}", err);
+    }
 }
 
 fn main() {
