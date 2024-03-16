@@ -127,8 +127,6 @@ impl Scanner {
             Some(ty) => self.add_token(*ty),
             None => self.add_token(TokenType::Identifier),
         }
-
-        self.add_token(TokenType::Identifier)
     }
 
     fn number(&mut self) {

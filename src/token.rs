@@ -19,7 +19,7 @@ pub static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
     "while" => TokenType::While,
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
@@ -70,11 +70,11 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
-    ty: TokenType,
-    lexeme: String,
-    line: usize,
+    pub ty: TokenType,
+    pub lexeme: String,
+    pub line: usize,
 }
 
 impl Token {
