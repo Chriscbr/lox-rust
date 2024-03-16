@@ -1,6 +1,7 @@
 use crate::{
     ast::{
-        Assign, Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp, VarDecl, Variable,
+        Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, Literal, Stmt, Unary, UnaryOp,
+        VarDecl, Variable,
     },
     error::Error,
     token::{Token, TokenType},
@@ -46,6 +47,10 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Result<Stmt, Error> {
+        if self.matches(&[TokenType::Fun]) {
+            return self.function(FunctionKind::Function);
+        }
+
         if self.matches(&[TokenType::Var]) {
             return self.var_declaration();
         }
@@ -68,7 +73,7 @@ impl Parser {
     fn print_statement(&mut self) -> Result<Stmt, Error> {
         let expr = self.expr()?;
         if !self.check(TokenType::Semicolon) {
-            return Err(Error::ExpectSemicolonAfterExpression {
+            return Err(Error::ExpectedSemicolonAfterExpression {
                 token: self.peek().clone(),
             });
         }
@@ -90,7 +95,7 @@ impl Parser {
         };
 
         if !self.check(TokenType::Semicolon) {
-            return Err(Error::ExpectSemicolonAfterExpression {
+            return Err(Error::ExpectedSemicolonAfterExpression {
                 token: self.peek().clone(),
             });
         }
@@ -101,12 +106,82 @@ impl Parser {
     fn expr_stmt(&mut self) -> Result<Stmt, Error> {
         let expr = self.expr()?;
         if !self.check(TokenType::Semicolon) {
-            return Err(Error::ExpectSemicolonAfterExpression {
+            return Err(Error::ExpectedSemicolonAfterExpression {
                 token: self.peek().clone(),
             });
         }
         self.advance();
         Ok(Stmt::Expr(expr))
+    }
+
+    fn function(&mut self, kind: FunctionKind) -> Result<Stmt, Error> {
+        if !self.check(TokenType::Identifier) {
+            let token = self.peek().clone();
+            match kind {
+                FunctionKind::Function => {
+                    return Err(Error::ExpectedFunctionName { token });
+                }
+                FunctionKind::Method => {
+                    return Err(Error::ExpectedMethodName { token });
+                }
+            }
+        }
+        let name = self.advance().lexeme.clone();
+
+        if !self.check(TokenType::LeftParen) {
+            let token = self.peek().clone();
+            return match kind {
+                FunctionKind::Function => Err(Error::ExpectedLeftParenAfterFunctionName { token }),
+                FunctionKind::Method => Err(Error::ExpectedLeftParenAfterMethodName { token }),
+            };
+        }
+        self.advance();
+
+        let mut params = vec![];
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if params.len() >= 255 {
+                    return Err(Error::TooManyParameters {
+                        token: self.peek().clone(),
+                    });
+                }
+
+                if !self.check(TokenType::Identifier) {
+                    return Err(Error::ExpectedParameterName {
+                        token: self.peek().clone(),
+                    });
+                }
+                params.push(self.advance().lexeme.clone());
+
+                if !self.matches(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        if !self.check(TokenType::RightParen) {
+            return Err(Error::ExpectedRightParenAfterParameters {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+
+        if !self.check(TokenType::LeftBrace) {
+            let token = self.peek().clone();
+            match kind {
+                FunctionKind::Function => {
+                    return Err(Error::ExpectedLeftBraceAfterFunction { token });
+                }
+                FunctionKind::Method => {
+                    return Err(Error::ExpectedLeftBraceAfterMethod { token });
+                }
+            }
+        }
+        self.advance();
+
+        let body = self.block()?;
+
+        Ok(Stmt::Function(Function { name, params, body }))
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>, Error> {
@@ -123,7 +198,7 @@ impl Parser {
         }
 
         if !self.check(TokenType::RightBrace) {
-            return Err(Error::ExpectRightBraceAfterBlock {
+            return Err(Error::ExpectedRightBraceAfterBlock {
                 token: self.peek().clone(),
             });
         }
@@ -232,7 +307,52 @@ impl Parser {
             }));
         }
 
-        return self.primary();
+        return self.call();
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr, Error> {
+        let mut args = vec![];
+
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if args.len() >= 255 {
+                    return Err(Error::TooManyArguments {
+                        token: self.peek().clone(),
+                    });
+                }
+
+                args.push(self.expr()?);
+                if !self.matches(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        if !self.check(TokenType::RightParen) {
+            return Err(Error::ExpectedRightParenAfterArguments {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+
+        Ok(Expr::Call(Call {
+            callee: Box::new(callee),
+            args,
+        }))
+    }
+
+    fn call(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.matches(&[TokenType::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
     }
 
     fn primary(&mut self) -> Result<Expr, Error> {
@@ -269,7 +389,7 @@ impl Parser {
         if self.matches(&[TokenType::LeftParen]) {
             let expr = self.expr()?;
             if !self.check(TokenType::RightParen) {
-                return Err(Error::ExpectRightParenAfterExpr {
+                return Err(Error::ExpectedRightParenAfterExpr {
                     token: self.peek().clone(),
                 });
             }
@@ -342,4 +462,9 @@ impl Parser {
             self.advance();
         }
     }
+}
+
+enum FunctionKind {
+    Function,
+    Method,
 }

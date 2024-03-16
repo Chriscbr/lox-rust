@@ -6,11 +6,22 @@ use crate::token::{Token, TokenType};
 pub enum Error {
     UnexpectedCharacter { line: usize },
     UnterminatedString { line: usize },
-    ExpectRightParenAfterExpr { token: Token },
-    ExpectSemicolonAfterExpression { token: Token },
+    ExpectedRightParenAfterExpr { token: Token },
+    ExpectedSemicolonAfterExpression { token: Token },
     ExpectedVariableName { token: Token },
     InvalidAssignmentTarget { token: Token },
-    ExpectRightBraceAfterBlock { token: Token },
+    ExpectedRightBraceAfterBlock { token: Token },
+    TooManyArguments { token: Token },
+    ExpectedRightParenAfterArguments { token: Token },
+    ExpectedFunctionName { token: Token },
+    ExpectedMethodName { token: Token },
+    ExpectedLeftParenAfterFunctionName { token: Token },
+    ExpectedLeftParenAfterMethodName { token: Token },
+    TooManyParameters { token: Token },
+    ExpectedParameterName { token: Token },
+    ExpectedRightParenAfterParameters { token: Token },
+    ExpectedLeftBraceAfterFunction { token: Token },
+    ExpectedLeftBraceAfterMethod { token: Token },
 }
 
 pub fn report_errors(errors: &[Error]) {
@@ -22,7 +33,7 @@ pub fn report_errors(errors: &[Error]) {
             Error::UnterminatedString { line } => {
                 println!("[line {}] Error: unterminated string.", line)
             }
-            Error::ExpectRightParenAfterExpr { token } => match token.ty {
+            Error::ExpectedRightParenAfterExpr { token } => match token.ty {
                 TokenType::EOF => println!(
                     "[line {}] Error at end: Expected ')' after expression.",
                     token.line
@@ -32,7 +43,7 @@ pub fn report_errors(errors: &[Error]) {
                     token.line, token.lexeme,
                 ),
             },
-            Error::ExpectSemicolonAfterExpression { token } => match token.ty {
+            Error::ExpectedSemicolonAfterExpression { token } => match token.ty {
                 TokenType::EOF => println!(
                     "[line {}] Error at end: Expected ';' after expression.",
                     token.line
@@ -62,13 +73,120 @@ pub fn report_errors(errors: &[Error]) {
                     token.line, token.lexeme
                 ),
             },
-            Error::ExpectRightBraceAfterBlock { token } => match token.ty {
+            Error::ExpectedRightBraceAfterBlock { token } => match token.ty {
                 TokenType::EOF => println!(
                     "[line {}] Error at end: Expected '}}' after block.",
                     token.line
                 ),
                 _ => println!(
                     "[line {}] Error at '{}': Expected '}}' after block.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::TooManyArguments { token } => match token.ty {
+                TokenType::EOF => {
+                    println!("[line {}] Error at end: Too many arguments.", token.line)
+                }
+                _ => println!(
+                    "[line {}] Error at '{}': Too many arguments.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedRightParenAfterArguments { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected ')' after arguments.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected ')' after arguments.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedFunctionName { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected function name.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected function name.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedMethodName { token } => match token.ty {
+                TokenType::EOF => {
+                    println!("[line {}] Error at end: Expected method name.", token.line)
+                }
+                _ => println!(
+                    "[line {}] Error at '{}': Expected method name.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedLeftParenAfterFunctionName { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected '(' after function name.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected '(' after function name.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedLeftParenAfterMethodName { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected '(' after method name.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected '(' after method name.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::TooManyParameters { token } => match token.ty {
+                TokenType::EOF => {
+                    println!("[line {}] Error at end: Too many parameters.", token.line)
+                }
+                _ => println!(
+                    "[line {}] Error at '{}': Too many parameters.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedParameterName { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected parameter name.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected parameter name.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedRightParenAfterParameters { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected ')' after parameters.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected ')' after parameters.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedLeftBraceAfterFunction { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected '{{' before function body.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected '{{' before function body.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedLeftBraceAfterMethod { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected '{{' before method body.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected '{{' before method body.",
                     token.line, token.lexeme
                 ),
             },

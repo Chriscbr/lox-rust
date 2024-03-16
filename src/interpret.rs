@@ -1,20 +1,37 @@
 mod env;
 mod value;
 
+use std::sync::Arc;
+
 use crate::ast::{
-    Assign, Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp, VarDecl, Variable,
+    Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, Literal, Stmt, Unary, UnaryOp,
+    VarDecl, Variable,
 };
 
-use self::{env::Environment, value::RuntimeValue};
+use self::{
+    env::Environment,
+    value::{Callable, RuntimeValue},
+};
 
 pub struct Interpreter {
     env: Environment,
+    globals: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let globals = Environment::new();
+        // globals.define(
+        //     "clock",
+        //     RuntimeValue::Callable(Callable {
+        //         arity: 0,
+        //         closure: value::clock,
+        //     }),
+        // );
+
         Self {
-            env: Environment::new(),
+            env: Environment::new_enclosing(&globals),
+            globals,
         }
     }
 
@@ -27,6 +44,7 @@ impl Interpreter {
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
+            Stmt::Function(func) => self.execute_function_decl(func),
             Stmt::Print(expr) => self.execute_print(expr),
             Stmt::Expr(expr) => self.execute_expr(expr),
             Stmt::VarDecl(var_decl) => self.execute_var_decl(var_decl),
@@ -35,6 +53,13 @@ impl Interpreter {
                 self.execute_block(stmts, env)
             }
         }
+    }
+
+    fn execute_function_decl(&mut self, fun: &Function) -> Result<(), RuntimeError> {
+        let arc = Arc::new(fun.clone()); // unfortunate clone
+        let value = RuntimeValue::Callable(Callable::new(fun.params.len(), arc));
+        self.env.define(&fun.name, value);
+        Ok(())
     }
 
     fn execute_print(&mut self, expr: &Expr) -> Result<(), RuntimeError> {
@@ -69,6 +94,7 @@ impl Interpreter {
     fn expr(&mut self, expr: &Expr) -> Result<RuntimeValue, RuntimeError> {
         match expr {
             Expr::Binary(b) => self.binary(b),
+            Expr::Call(c) => self.call(c),
             Expr::Grouping(g) => self.grouping(g),
             Expr::Literal(l) => self.literal(l),
             Expr::Unary(u) => self.unary(u),
@@ -134,6 +160,36 @@ impl Interpreter {
         }
     }
 
+    fn call(&mut self, call: &Call) -> Result<RuntimeValue, RuntimeError> {
+        let callee = self.expr(&call.callee)?;
+
+        let mut args = Vec::new();
+        for arg in &call.args {
+            args.push(self.expr(arg)?);
+        }
+
+        match callee {
+            RuntimeValue::Callable(f) => {
+                if args.len() != f.arity {
+                    return Err(RuntimeError::InvalidArgumentCount);
+                }
+
+                let mut env = Environment::new_enclosing(&self.globals);
+                for (param, arg) in f.fun.params.iter().zip(args) {
+                    env.define(param, arg);
+                }
+
+                let previous = std::mem::replace(&mut self.env, env);
+                let result = self.execute_block(&f.fun.body, self.env.clone());
+                self.env = previous;
+
+                result?;
+                Ok(RuntimeValue::Nil) // TODO: support return statements
+            }
+            _ => Err(RuntimeError::NotCallable),
+        }
+    }
+
     fn grouping(&mut self, grouping: &Grouping) -> Result<RuntimeValue, RuntimeError> {
         self.expr(&grouping.expr)
     }
@@ -194,6 +250,8 @@ pub enum RuntimeError {
     OperandsMustBeTwoNumbersOrTwoStrings,
     OperandMustBeNumber,
     UndefinedVariable(String),
+    InvalidArgumentCount,
+    NotCallable,
 }
 
 impl std::fmt::Display for RuntimeError {
@@ -205,6 +263,8 @@ impl std::fmt::Display for RuntimeError {
             }
             RuntimeError::OperandMustBeNumber => write!(f, "Operand must be a number"),
             RuntimeError::UndefinedVariable(name) => write!(f, "Undefined variable '{}'", name),
+            RuntimeError::InvalidArgumentCount => write!(f, "Invalid argument count"),
+            RuntimeError::NotCallable => write!(f, "Can only call functions and classes"),
         }
     }
 }

@@ -2,9 +2,10 @@ use std::fmt::Display;
 
 use crate::token::TokenType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Expr(Expr),
+    Function(Function),
     Print(Expr),
     VarDecl(VarDecl),
     Block(Vec<Stmt>),
@@ -14,6 +15,7 @@ impl Display for Stmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             Stmt::Expr(e) => format!("{};", e),
+            Stmt::Function(f) => format!("{}", f),
             Stmt::Print(e) => format!("print {};", e),
             Stmt::VarDecl(v) => format!("{}", v),
             Stmt::Block(stmts) => {
@@ -30,7 +32,33 @@ impl Display for Stmt {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub name: String,
+    pub params: Vec<String>,
+    pub body: Vec<Stmt>,
+}
+
+impl Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::new();
+        s.push_str(&format!("fun {}(", self.name));
+        for (i, param) in self.params.iter().enumerate() {
+            s.push_str(&format!("{}", param));
+            if i < self.params.len() - 1 {
+                s.push_str(", ");
+            }
+        }
+        s.push_str(") {\n");
+        for stmt in &self.body {
+            s.push_str(&format!("{}\n", stmt));
+        }
+        s.push_str("}");
+        write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct VarDecl {
     pub name: String,
     pub initializer: Option<Expr>,
@@ -46,9 +74,10 @@ impl Display for VarDecl {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Binary(Binary),
+    Call(Call),
     Grouping(Grouping),
     Literal(Literal),
     Unary(Unary),
@@ -60,6 +89,7 @@ impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             Expr::Binary(b) => format!("{}", b),
+            Expr::Call(c) => format!("{}", c),
             Expr::Grouping(g) => format!("{}", g),
             Expr::Literal(l) => format!("{}", l),
             Expr::Unary(u) => format!("{}", u),
@@ -70,7 +100,7 @@ impl Display for Expr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Binary {
     pub left: Box<Expr>,
     pub op: BinaryOp,
@@ -83,7 +113,28 @@ impl Display for Binary {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct Call {
+    pub callee: Box<Expr>,
+    pub args: Vec<Expr>,
+}
+
+impl Display for Call {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::new();
+        s.push_str(&format!("{}(", self.callee));
+        for (i, arg) in self.args.iter().enumerate() {
+            s.push_str(&format!("{}", arg));
+            if i < self.args.len() - 1 {
+                s.push_str(", ");
+            }
+        }
+        s.push_str(")");
+        write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Grouping {
     pub expr: Box<Expr>,
 }
@@ -94,7 +145,7 @@ impl Display for Grouping {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     Number(f64),
     String(String),
@@ -114,7 +165,7 @@ impl Display for Literal {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Unary {
     pub op: UnaryOp,
     pub right: Box<Expr>,
@@ -126,7 +177,7 @@ impl Display for Unary {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Variable {
     pub name: String,
 }
@@ -137,7 +188,7 @@ impl Display for Variable {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Assign {
     pub name: String,
     pub value: Box<Expr>,
@@ -149,7 +200,7 @@ impl Display for Assign {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -199,7 +250,7 @@ impl From<TokenType> for BinaryOp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryOp {
     Not,
     Negate,
