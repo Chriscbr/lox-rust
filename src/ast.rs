@@ -3,6 +3,22 @@ use std::fmt::Display;
 use crate::token::TokenType;
 
 #[derive(Debug)]
+pub enum Stmt {
+    Expr(Expr),
+    Print(Expr),
+}
+
+impl Display for Stmt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Stmt::Expr(e) => format!("{};", e),
+            Stmt::Print(e) => format!("print {};", e),
+        };
+        write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug)]
 pub enum Expr {
     Binary(Binary),
     Grouping(Grouping),

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::ast::{Binary, BinaryOp, Expr, Grouping, Literal, Unary, UnaryOp};
+use crate::ast::{Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp};
 
 pub enum RuntimeValue {
     Nil,
@@ -35,10 +35,21 @@ impl Interpreter {
         Self {}
     }
 
-    pub fn interpret(&self, expr: &Expr) {
-        match self.expr(expr) {
-            Ok(value) => println!("{}", value),
-            Err(err) => println!("{:?}", err),
+    pub fn interpret(&self, stmts: &[Stmt]) {
+        for stmt in stmts {
+            self.execute(stmt);
+        }
+    }
+
+    fn execute(&self, stmt: &Stmt) {
+        match stmt {
+            Stmt::Print(expr) => {
+                let value = self.expr(expr).unwrap();
+                println!("{}", value);
+            }
+            Stmt::Expr(expr) => {
+                self.expr(expr).unwrap();
+            }
         }
     }
 

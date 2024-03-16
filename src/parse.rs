@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Binary, BinaryOp, Expr, Grouping, Literal, Unary, UnaryOp},
+    ast::{Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp},
     error::Error,
     token::{Token, TokenType},
 };
@@ -14,12 +14,48 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<Expr, Error> {
-        return self.expr();
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, Error> {
+        let mut stmts = vec![];
+        while !self.is_at_end() {
+            let stmt = self.stmt()?;
+            stmts.push(stmt);
+        }
+
+        Ok(stmts)
     }
 
     fn expr(&mut self) -> Result<Expr, Error> {
         self.equality()
+    }
+
+    fn stmt(&mut self) -> Result<Stmt, Error> {
+        if self.matches(&[TokenType::Print]) {
+            return self.print_statement();
+        }
+
+        self.expr_stmt()
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt, Error> {
+        let expr = self.expr()?;
+        if !self.check(TokenType::Semicolon) {
+            return Err(Error::ExpectSemicolonAfterExpression {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+        Ok(Stmt::Print(expr))
+    }
+
+    fn expr_stmt(&mut self) -> Result<Stmt, Error> {
+        let expr = self.expr()?;
+        if !self.check(TokenType::Semicolon) {
+            return Err(Error::ExpectSemicolonAfterExpression {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+        Ok(Stmt::Expr(expr))
     }
 
     fn equality(&mut self) -> Result<Expr, Error> {

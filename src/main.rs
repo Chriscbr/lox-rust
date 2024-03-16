@@ -8,11 +8,10 @@ mod token;
 use std::fs::read_to_string;
 
 use clap::Parser as ClapParser;
-use error::Error;
+use error::report_errors;
 use interpret::Interpreter;
 use parse::Parser;
 use scanner::Scanner;
-use token::TokenType;
 
 /// Run a Lox program.
 #[derive(ClapParser, Debug)]
@@ -34,7 +33,7 @@ fn run(source: String) {
     let mut parser = Parser::new(tokens);
     let parsed = parser.parse();
 
-    let parsed = match parsed {
+    let stmts = match parsed {
         Ok(expr) => expr,
         Err(err) => {
             report_errors(&[err]);
@@ -43,30 +42,7 @@ fn run(source: String) {
     };
 
     let interpreter = Interpreter::new();
-    interpreter.interpret(&parsed);
-}
-
-fn report_errors(errors: &[Error]) {
-    for error in errors {
-        match error {
-            Error::UnexpectedCharacter { line } => {
-                println!("[line {}] Error: unexpected character.", line)
-            }
-            Error::UnterminatedString { line } => {
-                println!("[line {}] Error: unterminated string.", line)
-            }
-            Error::ExpectRightParenAfterExpr { token } => match token.ty {
-                TokenType::EOF => println!(
-                    "[line {}] Error at end: Expected ')' after expression.",
-                    token.line
-                ),
-                _ => println!(
-                    "[line {}] Error at '{}': Expected ')' after expression.",
-                    token.line, token.lexeme,
-                ),
-            },
-        }
-    }
+    interpreter.interpret(&stmts);
 }
 
 fn main() {
