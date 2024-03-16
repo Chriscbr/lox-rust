@@ -137,8 +137,8 @@ pub enum UnaryOp {
 impl From<TokenType> for UnaryOp {
     fn from(ty: TokenType) -> Self {
         match ty {
-            TokenType::Minus => UnaryOp::Not,
-            TokenType::Bang => UnaryOp::Negate,
+            TokenType::Minus => UnaryOp::Negate,
+            TokenType::Bang => UnaryOp::Not,
             _ => panic!("Invalid token for unary op"),
         }
     }

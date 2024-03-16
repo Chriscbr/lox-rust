@@ -1,5 +1,6 @@
 mod ast;
 mod error;
+mod interpret;
 mod parse;
 mod scanner;
 mod token;
@@ -8,6 +9,7 @@ use std::fs::read_to_string;
 
 use clap::Parser as ClapParser;
 use error::Error;
+use interpret::Interpreter;
 use parse::Parser;
 use scanner::Scanner;
 use token::TokenType;
@@ -32,10 +34,16 @@ fn run(source: String) {
     let mut parser = Parser::new(tokens);
     let parsed = parser.parse();
 
-    match parsed {
-        Ok(expr) => println!("{}", expr),
-        Err(err) => report_errors(&[err]),
+    let parsed = match parsed {
+        Ok(expr) => expr,
+        Err(err) => {
+            report_errors(&[err]);
+            return;
+        }
     };
+
+    let interpreter = Interpreter::new();
+    interpreter.interpret(&parsed);
 }
 
 fn report_errors(errors: &[Error]) {
@@ -47,7 +55,7 @@ fn report_errors(errors: &[Error]) {
             Error::UnterminatedString { line } => {
                 println!("[line {}] Error: unterminated string.", line)
             }
-            Error::ExpectRightParenAfterExpression { token } => match token.ty {
+            Error::ExpectRightParenAfterExpr { token } => match token.ty {
                 TokenType::EOF => println!(
                     "[line {}] Error at end: Expected ')' after expression.",
                     token.line

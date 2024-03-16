@@ -6,5 +6,5 @@ use crate::token::Token;
 pub enum Error {
     UnexpectedCharacter { line: usize },
     UnterminatedString { line: usize },
-    ExpectRightParenAfterExpression { token: Token },
+    ExpectRightParenAfterExpr { token: Token },
 }

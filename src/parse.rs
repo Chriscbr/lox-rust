@@ -15,10 +15,10 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Expr, Error> {
-        return self.expression();
+        return self.expr();
     }
 
-    fn expression(&mut self) -> Result<Expr, Error> {
+    fn expr(&mut self) -> Result<Expr, Error> {
         self.equality()
     }
 
@@ -130,9 +130,9 @@ impl Parser {
         }
 
         if self.matches(&[TokenType::LeftParen]) {
-            let expr = self.expression()?;
+            let expr = self.expr()?;
             if !self.check(TokenType::RightParen) {
-                return Err(Error::ExpectRightParenAfterExpression {
+                return Err(Error::ExpectRightParenAfterExpr {
                     token: self.peek().clone(),
                 });
             }
