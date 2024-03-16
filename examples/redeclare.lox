@@ -1,0 +1,5 @@
+// this should error
+fun bad() {
+  var a = "first";
+  var a = "second";
+}

@@ -1,0 +1,4 @@
+class Bagel {}
+var bagel = Bagel();
+bagel.variety = "sesame";
+print bagel.variety; // prints "sesame"
