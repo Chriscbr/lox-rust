@@ -1,5 +1,7 @@
 use crate::{
-    ast::{Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp, VarDecl, Variable},
+    ast::{
+        Assign, Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp, VarDecl, Variable,
+    },
     error::Error,
     token::{Token, TokenType},
 };
@@ -19,7 +21,7 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, Error> {
+    pub fn parse(mut self) -> Result<Vec<Stmt>, Vec<Error>> {
         let mut stmts = vec![];
         while !self.is_at_end() {
             let stmt = self.declaration();
@@ -32,11 +34,15 @@ impl Parser {
             }
         }
 
-        Ok(stmts)
+        if self.errors.is_empty() {
+            Ok(stmts)
+        } else {
+            Err(self.errors)
+        }
     }
 
     fn expr(&mut self) -> Result<Expr, Error> {
-        self.equality()
+        self.assignment()
     }
 
     fn declaration(&mut self) -> Result<Stmt, Error> {
@@ -97,6 +103,28 @@ impl Parser {
         }
         self.advance();
         Ok(Stmt::Expr(expr))
+    }
+
+    fn assignment(&mut self) -> Result<Expr, Error> {
+        let expr = self.equality()?;
+
+        if self.matches(&[TokenType::Equal]) {
+            let equals = self.previous().clone();
+            let value = self.assignment()?;
+
+            if let Expr::Variable(v) = expr {
+                return Ok(Expr::Assign(Assign {
+                    name: v.name,
+                    value: Box::new(value),
+                }));
+            }
+
+            return Err(Error::InvalidAssignmentTarget {
+                token: equals.clone(),
+            });
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr, Error> {

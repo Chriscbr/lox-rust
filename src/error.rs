@@ -9,6 +9,7 @@ pub enum Error {
     ExpectRightParenAfterExpr { token: Token },
     ExpectSemicolonAfterExpression { token: Token },
     ExpectedVariableName { token: Token },
+    InvalidAssignmentTarget { token: Token },
 }
 
 pub fn report_errors(errors: &[Error]) {
@@ -47,6 +48,16 @@ pub fn report_errors(errors: &[Error]) {
                 ),
                 _ => println!(
                     "[line {}] Error at '{}': Expected variable name.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::InvalidAssignmentTarget { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Invalid assignment target.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Invalid assignment target.",
                     token.line, token.lexeme
                 ),
             },

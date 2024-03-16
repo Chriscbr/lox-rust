@@ -23,4 +23,13 @@ impl Environment {
             None => Err(RuntimeError::UndefinedVariable(name.to_string())),
         }
     }
+
+    pub fn assign(&mut self, name: &str, value: RuntimeValue) -> Result<(), RuntimeError> {
+        if self.values.contains_key(name) {
+            self.values.insert(name.to_string(), value);
+            Ok(())
+        } else {
+            Err(RuntimeError::UndefinedVariable(name.to_string()))
+        }
+    }
 }

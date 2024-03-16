@@ -43,6 +43,7 @@ pub enum Expr {
     Literal(Literal),
     Unary(Unary),
     Variable(Variable),
+    Assign(Assign),
 }
 
 impl Display for Expr {
@@ -53,6 +54,7 @@ impl Display for Expr {
             Expr::Literal(l) => format!("{}", l),
             Expr::Unary(u) => format!("{}", u),
             Expr::Variable(v) => format!("{}", v),
+            Expr::Assign(a) => format!("{}", a),
         };
         write!(f, "{}", s)
     }
@@ -122,6 +124,18 @@ pub struct Variable {
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
+    }
+}
+
+#[derive(Debug)]
+pub struct Assign {
+    pub name: String,
+    pub value: Box<Expr>,
+}
+
+impl Display for Assign {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} = {}", self.name, self.value)
     }
 }
 

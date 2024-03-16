@@ -1,7 +1,9 @@
 mod env;
 mod value;
 
-use crate::ast::{Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp, Variable};
+use crate::ast::{
+    Assign, Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp, Variable,
+};
 
 use self::{env::Environment, value::RuntimeValue};
 
@@ -43,17 +45,18 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn expr(&self, expr: &Expr) -> Result<RuntimeValue, RuntimeError> {
+    pub fn expr(&mut self, expr: &Expr) -> Result<RuntimeValue, RuntimeError> {
         match expr {
             Expr::Binary(b) => self.binary(b),
             Expr::Grouping(g) => self.grouping(g),
             Expr::Literal(l) => self.literal(l),
             Expr::Unary(u) => self.unary(u),
             Expr::Variable(v) => self.variable(v),
+            Expr::Assign(a) => self.assign(a),
         }
     }
 
-    fn binary(&self, binary: &Binary) -> Result<RuntimeValue, RuntimeError> {
+    fn binary(&mut self, binary: &Binary) -> Result<RuntimeValue, RuntimeError> {
         let left = self.expr(&binary.left)?;
         let right = self.expr(&binary.right)?;
 
@@ -110,7 +113,7 @@ impl Interpreter {
         }
     }
 
-    fn grouping(&self, grouping: &Grouping) -> Result<RuntimeValue, RuntimeError> {
+    fn grouping(&mut self, grouping: &Grouping) -> Result<RuntimeValue, RuntimeError> {
         self.expr(&grouping.expr)
     }
 
@@ -123,7 +126,7 @@ impl Interpreter {
         }
     }
 
-    fn unary(&self, unary: &Unary) -> Result<RuntimeValue, RuntimeError> {
+    fn unary(&mut self, unary: &Unary) -> Result<RuntimeValue, RuntimeError> {
         let right = self.expr(&unary.right)?;
 
         match unary.op {
@@ -137,6 +140,12 @@ impl Interpreter {
 
     fn variable(&self, variable: &Variable) -> Result<RuntimeValue, RuntimeError> {
         self.env.get(&variable.name)
+    }
+
+    fn assign(&mut self, assign: &Assign) -> Result<RuntimeValue, RuntimeError> {
+        let value = self.expr(&assign.value)?;
+        self.env.assign(&assign.name, value.clone())?;
+        Ok(value)
     }
 
     fn is_truthy(&self, value: &RuntimeValue) -> bool {

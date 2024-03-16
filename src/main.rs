@@ -30,13 +30,13 @@ fn run(source: String) {
         return;
     }
 
-    let mut parser = Parser::new(tokens);
+    let parser = Parser::new(tokens);
     let parsed = parser.parse();
 
     let stmts = match parsed {
         Ok(expr) => expr,
-        Err(err) => {
-            report_errors(&[err]);
+        Err(errors) => {
+            report_errors(&errors);
             return;
         }
     };
