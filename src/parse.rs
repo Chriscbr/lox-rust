@@ -58,6 +58,10 @@ impl Parser {
             return self.print_statement();
         }
 
+        if self.matches(&[TokenType::LeftBrace]) {
+            return Ok(Stmt::Block(self.block()?));
+        }
+
         self.expr_stmt()
     }
 
@@ -103,6 +107,28 @@ impl Parser {
         }
         self.advance();
         Ok(Stmt::Expr(expr))
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>, Error> {
+        let mut stmts = vec![];
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            let stmt = self.declaration();
+            match stmt {
+                Ok(stmt) => stmts.push(stmt),
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize();
+                }
+            }
+        }
+
+        if !self.check(TokenType::RightBrace) {
+            return Err(Error::ExpectRightBraceAfterBlock {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+        Ok(stmts)
     }
 
     fn assignment(&mut self) -> Result<Expr, Error> {

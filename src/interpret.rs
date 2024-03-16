@@ -2,7 +2,7 @@ mod env;
 mod value;
 
 use crate::ast::{
-    Assign, Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp, Variable,
+    Assign, Binary, BinaryOp, Expr, Grouping, Literal, Stmt, Unary, UnaryOp, VarDecl, Variable,
 };
 
 use self::{env::Environment, value::RuntimeValue};
@@ -27,25 +27,46 @@ impl Interpreter {
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
-            Stmt::Print(expr) => {
-                let value = self.expr(expr)?;
-                println!("{}", value);
-            }
-            Stmt::Expr(expr) => {
-                self.expr(expr)?;
-            }
-            Stmt::VarDecl(var_decl) => {
-                let value = match &var_decl.initializer {
-                    Some(expr) => self.expr(expr)?,
-                    None => RuntimeValue::Nil,
-                };
-                self.env.define(&var_decl.name, value);
+            Stmt::Print(expr) => self.execute_print(expr),
+            Stmt::Expr(expr) => self.execute_expr(expr),
+            Stmt::VarDecl(var_decl) => self.execute_var_decl(var_decl),
+            Stmt::Block(stmts) => {
+                let env = Environment::new_enclosing(&self.env);
+                self.execute_block(stmts, env)
             }
         }
+    }
+
+    fn execute_print(&mut self, expr: &Expr) -> Result<(), RuntimeError> {
+        let value = self.expr(expr)?;
+        println!("{}", value);
         Ok(())
     }
 
-    pub fn expr(&mut self, expr: &Expr) -> Result<RuntimeValue, RuntimeError> {
+    fn execute_expr(&mut self, expr: &Expr) -> Result<(), RuntimeError> {
+        self.expr(expr)?;
+        Ok(())
+    }
+
+    fn execute_var_decl(&mut self, var_decl: &VarDecl) -> Result<(), RuntimeError> {
+        let value = match &var_decl.initializer {
+            Some(expr) => self.expr(expr)?,
+            None => RuntimeValue::Nil,
+        };
+        self.env.define(&var_decl.name, value);
+        Ok(())
+    }
+
+    fn execute_block(&mut self, stmts: &[Stmt], env: Environment) -> Result<(), RuntimeError> {
+        let previous = std::mem::replace(&mut self.env, env);
+        for stmt in stmts {
+            self.execute(stmt)?;
+        }
+        self.env = previous;
+        Ok(())
+    }
+
+    fn expr(&mut self, expr: &Expr) -> Result<RuntimeValue, RuntimeError> {
         match expr {
             Expr::Binary(b) => self.binary(b),
             Expr::Grouping(g) => self.grouping(g),

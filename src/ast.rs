@@ -7,6 +7,7 @@ pub enum Stmt {
     Expr(Expr),
     Print(Expr),
     VarDecl(VarDecl),
+    Block(Vec<Stmt>),
 }
 
 impl Display for Stmt {
@@ -15,6 +16,15 @@ impl Display for Stmt {
             Stmt::Expr(e) => format!("{};", e),
             Stmt::Print(e) => format!("print {};", e),
             Stmt::VarDecl(v) => format!("{}", v),
+            Stmt::Block(stmts) => {
+                let mut s = String::new();
+                s.push_str("{\n");
+                for stmt in stmts {
+                    s.push_str(&format!("{}\n", stmt));
+                }
+                s.push_str("}");
+                s
+            }
         };
         write!(f, "{}", s)
     }
