@@ -5,7 +5,7 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use crate::ast::{
     Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, If, Literal, Logical, LogicalOp,
-    Stmt, Unary, UnaryOp, VarDecl, Variable, While,
+    Print, Return, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
 };
 
 use self::{
@@ -43,6 +43,8 @@ impl Interpreter {
     }
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+        dbg!(&self.env);
+        dbg!(&stmt);
         match stmt {
             Stmt::Block(stmts) => {
                 let env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
@@ -51,7 +53,8 @@ impl Interpreter {
             Stmt::Expr(expr) => self.execute_expr(expr),
             Stmt::Function(func) => self.execute_function_decl(func),
             Stmt::If(i) => self.execute_if(i),
-            Stmt::Print(expr) => self.execute_print(expr),
+            Stmt::Print(p) => self.execute_print(p),
+            Stmt::Return(r) => self.execute_return(r),
             Stmt::VarDecl(var_decl) => self.execute_var_decl(var_decl),
             Stmt::While(w) => self.execute_while(w),
         }
@@ -70,20 +73,14 @@ impl Interpreter {
         Ok(())
     }
 
+    fn execute_expr(&mut self, expr: &Expr) -> Result<(), RuntimeError> {
+        self.expr(expr)?;
+        Ok(())
+    }
+
     fn execute_function_decl(&mut self, fun: &Arc<Function>) -> Result<(), RuntimeError> {
         let value = RuntimeValue::Callable(Callable::new(fun.params.len(), fun.clone()));
         self.env.borrow_mut().define(&fun.name, value)?;
-        Ok(())
-    }
-
-    fn execute_print(&mut self, expr: &Expr) -> Result<(), RuntimeError> {
-        let value = self.expr(expr)?;
-        println!("{}", value);
-        Ok(())
-    }
-
-    fn execute_expr(&mut self, expr: &Expr) -> Result<(), RuntimeError> {
-        self.expr(expr)?;
         Ok(())
     }
 
@@ -95,6 +92,20 @@ impl Interpreter {
             self.execute(else_branch)?;
         }
         Ok(())
+    }
+
+    fn execute_print(&mut self, p: &Print) -> Result<(), RuntimeError> {
+        let value = self.expr(&p.expr)?;
+        println!("{}", value);
+        Ok(())
+    }
+
+    fn execute_return(&mut self, r: &Return) -> Result<(), RuntimeError> {
+        let value = match &r.value {
+            Some(expr) => self.expr(expr)?,
+            None => RuntimeValue::Nil,
+        };
+        Err(RuntimeError::ReturnValue(value))
     }
 
     fn execute_var_decl(&mut self, var_decl: &VarDecl) -> Result<(), RuntimeError> {
@@ -209,8 +220,11 @@ impl Interpreter {
                 let result = self.execute_block(&f.fun.body, self.env.clone());
                 self.set_current_env(previous);
 
-                result?;
-                Ok(RuntimeValue::Nil) // TODO: support return statements?
+                match result {
+                    Ok(_) => Ok(RuntimeValue::Nil),
+                    Err(RuntimeError::ReturnValue(value)) => Ok(value),
+                    Err(e) => Err(e),
+                }
             }
             _ => Err(RuntimeError::NotCallable),
         }
@@ -302,6 +316,7 @@ pub enum RuntimeError {
     InvalidArgumentCount,
     NotCallable,
     AlreadyDefined(String),
+    ReturnValue(RuntimeValue),
 }
 
 impl std::fmt::Display for RuntimeError {
@@ -322,6 +337,7 @@ impl std::fmt::Display for RuntimeError {
                     name
                 )
             }
+            RuntimeError::ReturnValue(_) => panic!("Unhandled return value runtime error"),
         }
     }
 }

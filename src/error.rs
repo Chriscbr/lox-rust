@@ -29,6 +29,7 @@ pub enum Error {
     ExpectedRightParenAfterParameters { token: Token },
     ExpectedLeftBraceAfterFunction { token: Token },
     ExpectedLeftBraceAfterMethod { token: Token },
+    ExpectedSemicolonAfterReturn { token: Token },
 }
 
 pub fn report_errors(errors: &[Error]) {
@@ -264,6 +265,16 @@ pub fn report_errors(errors: &[Error]) {
                 ),
                 _ => println!(
                     "[line {}] Error at '{}': Expected '{{' before method body.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedSemicolonAfterReturn { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected ';' after return.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected ';' after return.",
                     token.line, token.lexeme
                 ),
             },

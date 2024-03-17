@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     ast::{
         Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, If, Literal, Logical, LogicalOp,
-        Stmt, Unary, UnaryOp, VarDecl, Variable, While,
+        Print, Return, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
     },
     error::Error,
     token::{Token, TokenType},
@@ -71,6 +71,10 @@ impl Parser {
 
         if self.matches(&[TokenType::Print]) {
             return self.parse_print_stmt();
+        }
+
+        if self.matches(&[TokenType::Return]) {
+            return self.parse_return_stmt();
         }
 
         if self.matches(&[TokenType::While]) {
@@ -183,7 +187,25 @@ impl Parser {
             });
         }
         self.advance();
-        Ok(Stmt::Print(expr))
+        Ok(Stmt::Print(Print {
+            expr: Box::new(expr),
+        }))
+    }
+
+    fn parse_return_stmt(&mut self) -> Result<Stmt, Error> {
+        let value = if !self.check(TokenType::Semicolon) {
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+
+        if !self.check(TokenType::Semicolon) {
+            return Err(Error::ExpectedSemicolonAfterReturn {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+        Ok(Stmt::Return(Return { value }))
     }
 
     fn parse_while_stmt(&mut self) -> Result<Stmt, Error> {

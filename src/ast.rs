@@ -8,7 +8,8 @@ pub enum Stmt {
     Expr(Expr),
     Function(Arc<Function>),
     If(If),
-    Print(Expr),
+    Print(Print),
+    Return(Return),
     VarDecl(VarDecl),
     While(While),
 }
@@ -28,7 +29,8 @@ impl Display for Stmt {
             Stmt::Expr(e) => format!("{};", e),
             Stmt::Function(f) => format!("{}", f),
             Stmt::If(i) => format!("{}", i),
-            Stmt::Print(e) => format!("print {};", e),
+            Stmt::Print(p) => format!("{}", p),
+            Stmt::Return(r) => format!("{}", r),
             Stmt::VarDecl(v) => format!("{}", v),
             Stmt::While(w) => format!("{}", w),
         };
@@ -77,6 +79,32 @@ impl Display for If {
                 self.condition, self.then_branch, else_branch
             ),
             None => format!("if ({}) {}", self.condition, self.then_branch),
+        };
+        write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Print {
+    pub expr: Box<Expr>,
+}
+
+impl Display for Print {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "print {};", self.expr)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Return {
+    pub value: Option<Expr>,
+}
+
+impl Display for Return {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match &self.value {
+            Some(e) => format!("return {};", e),
+            None => format!("return;"),
         };
         write!(f, "{}", s)
     }
@@ -290,13 +318,13 @@ impl From<TokenType> for BinaryOp {
             TokenType::Minus => BinaryOp::Sub,
             TokenType::Star => BinaryOp::Mul,
             TokenType::Slash => BinaryOp::Div,
-            TokenType::Equal => BinaryOp::Eq,
+            TokenType::EqualEqual => BinaryOp::Eq,
             TokenType::BangEqual => BinaryOp::NotEq,
             TokenType::Less => BinaryOp::Lt,
             TokenType::LessEqual => BinaryOp::LtEq,
             TokenType::Greater => BinaryOp::Gt,
             TokenType::GreaterEqual => BinaryOp::GtEq,
-            _ => panic!("Invalid token for binary op"),
+            _ => panic!("Invalid token for binary op: {:?}", ty),
         }
     }
 }
@@ -312,7 +340,7 @@ impl From<TokenType> for LogicalOp {
         match ty {
             TokenType::And => LogicalOp::And,
             TokenType::Or => LogicalOp::Or,
-            _ => panic!("Invalid token for logical op"),
+            _ => panic!("Invalid token for logical op: {:?}", ty),
         }
     }
 }
@@ -338,7 +366,7 @@ impl From<TokenType> for UnaryOp {
         match ty {
             TokenType::Minus => UnaryOp::Negate,
             TokenType::Bang => UnaryOp::Not,
-            _ => panic!("Invalid token for unary op"),
+            _ => panic!("Invalid token for unary op: {:?}", ty),
         }
     }
 }
