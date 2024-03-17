@@ -43,8 +43,6 @@ impl Interpreter {
     }
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
-        dbg!(&self.env);
-        dbg!(&stmt);
         match stmt {
             Stmt::Block(stmts) => {
                 let env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
@@ -79,7 +77,11 @@ impl Interpreter {
     }
 
     fn execute_function_decl(&mut self, fun: &Arc<Function>) -> Result<(), RuntimeError> {
-        let value = RuntimeValue::Callable(Callable::new(fun.params.len(), fun.clone()));
+        let value = RuntimeValue::Callable(Callable::new(
+            fun.params.len(),
+            fun.clone(),
+            self.env.clone(),
+        ));
         self.env.borrow_mut().define(&fun.name, value)?;
         Ok(())
     }
@@ -211,7 +213,7 @@ impl Interpreter {
                     return Err(RuntimeError::InvalidArgumentCount);
                 }
 
-                let env = Rc::new(RefCell::new(Environment::new(Some(self.globals.clone()))));
+                let env = Rc::new(RefCell::new(Environment::new(Some(f.closure.clone()))));
                 for (param, arg) in f.fun.params.iter().zip(args) {
                     env.borrow_mut().define(param, arg)?;
                 }

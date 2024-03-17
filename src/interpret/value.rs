@@ -1,8 +1,8 @@
-use std::{fmt::Display, sync::Arc};
+use std::{cell::RefCell, fmt::Display, rc::Rc, sync::Arc};
 
 use crate::ast::Function;
 
-use super::RuntimeError;
+use super::{env::Environment, RuntimeError};
 
 #[derive(Debug, Clone)]
 pub enum RuntimeValue {
@@ -17,11 +17,16 @@ pub enum RuntimeValue {
 pub struct Callable {
     pub arity: usize,
     pub fun: Arc<Function>,
+    pub closure: Rc<RefCell<Environment>>,
 }
 
 impl Callable {
-    pub fn new(arity: usize, fun: Arc<Function>) -> Self {
-        Self { arity, fun }
+    pub fn new(arity: usize, fun: Arc<Function>, closure: Rc<RefCell<Environment>>) -> Self {
+        Self {
+            arity,
+            fun,
+            closure,
+        }
     }
 }
 
