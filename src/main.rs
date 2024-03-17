@@ -1,5 +1,4 @@
 mod ast;
-mod error;
 mod interpret;
 mod parse;
 mod scanner;
@@ -8,9 +7,8 @@ mod token;
 use std::fs::read_to_string;
 
 use clap::Parser as ClapParser;
-use error::report_errors;
 use interpret::Interpreter;
-use parse::Parser;
+use parse::{report_parse_errors, Parser};
 use scanner::Scanner;
 
 /// Run a Lox program.
@@ -26,7 +24,9 @@ fn run(source: String) {
     let (tokens, errors) = scanner.scan_tokens();
 
     if errors.len() > 0 {
-        report_errors(&errors);
+        for (error, line) in errors {
+            println!("[line {}] Error: {}", line, error);
+        }
         return;
     }
 
@@ -36,7 +36,7 @@ fn run(source: String) {
     let stmts = match parsed {
         Ok(expr) => expr,
         Err(errors) => {
-            report_errors(&errors);
+            report_parse_errors(errors);
             return;
         }
     };

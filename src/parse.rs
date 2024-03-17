@@ -1,18 +1,17 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use crate::{
     ast::{
         Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, If, Literal, Logical, LogicalOp,
         Print, Return, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
     },
-    error::Error,
     token::{Token, TokenType},
 };
 
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
-    errors: Vec<Error>,
+    errors: Vec<(ParseError, Token)>,
 }
 
 impl Parser {
@@ -24,7 +23,7 @@ impl Parser {
         }
     }
 
-    pub fn parse(mut self) -> Result<Vec<Stmt>, Vec<Error>> {
+    pub fn parse(mut self) -> Result<Vec<Stmt>, Vec<(ParseError, Token)>> {
         let mut stmts = vec![];
         while !self.is_at_end() {
             let stmt = self.parse_declaration();
@@ -44,11 +43,11 @@ impl Parser {
         }
     }
 
-    fn parse_expr(&mut self) -> Result<Expr, Error> {
+    fn parse_expr(&mut self) -> Result<Expr, (ParseError, Token)> {
         self.parse_assignment()
     }
 
-    fn parse_declaration(&mut self) -> Result<Stmt, Error> {
+    fn parse_declaration(&mut self) -> Result<Stmt, (ParseError, Token)> {
         if self.matches(&[TokenType::Fun]) {
             return self.parse_function(FunctionKind::Function);
         }
@@ -60,7 +59,7 @@ impl Parser {
         self.parse_stmt()
     }
 
-    fn parse_stmt(&mut self) -> Result<Stmt, Error> {
+    fn parse_stmt(&mut self) -> Result<Stmt, (ParseError, Token)> {
         if self.matches(&[TokenType::For]) {
             return self.parse_for_stmt();
         }
@@ -88,11 +87,9 @@ impl Parser {
         self.parse_expr_stmt()
     }
 
-    fn parse_for_stmt(&mut self) -> Result<Stmt, Error> {
+    fn parse_for_stmt(&mut self) -> Result<Stmt, (ParseError, Token)> {
         if !self.check(TokenType::LeftParen) {
-            return Err(Error::ExpectedLeftParenAfterFor {
-                token: self.peek().clone(),
-            });
+            return Err((ParseError::ExpectedLeftParenAfterFor, self.peek().clone()));
         }
         self.advance();
 
@@ -111,9 +108,10 @@ impl Parser {
         };
 
         if !self.check(TokenType::Semicolon) {
-            return Err(Error::ExpectedSemicolonAfterLoopCondition {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedSemicolonAfterLoopCondition,
+                self.peek().clone(),
+            ));
         }
         self.advance();
 
@@ -124,9 +122,10 @@ impl Parser {
         };
 
         if !self.check(TokenType::RightParen) {
-            return Err(Error::ExpectedRightParenAfterForLoop {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedRightParenAfterForLoop,
+                self.peek().clone(),
+            ));
         }
         self.advance();
 
@@ -148,20 +147,19 @@ impl Parser {
         Ok(body)
     }
 
-    fn parse_if_stmt(&mut self) -> Result<Stmt, Error> {
+    fn parse_if_stmt(&mut self) -> Result<Stmt, (ParseError, Token)> {
         if !self.check(TokenType::LeftParen) {
-            return Err(Error::ExpectedLeftParenAfterIf {
-                token: self.peek().clone(),
-            });
+            return Err((ParseError::ExpectedLeftParenAfterIf, self.peek().clone()));
         }
         self.advance();
 
         let condition = self.parse_expr()?;
 
         if !self.check(TokenType::RightParen) {
-            return Err(Error::ExpectedRightParenAfterIfCondition {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedRightParenAfterIfCondition,
+                self.peek().clone(),
+            ));
         }
         self.advance();
 
@@ -179,12 +177,13 @@ impl Parser {
         }))
     }
 
-    fn parse_print_stmt(&mut self) -> Result<Stmt, Error> {
+    fn parse_print_stmt(&mut self) -> Result<Stmt, (ParseError, Token)> {
         let expr = self.parse_expr()?;
         if !self.check(TokenType::Semicolon) {
-            return Err(Error::ExpectedSemicolonAfterExpression {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedSemicolonAfterExpression,
+                self.peek().clone(),
+            ));
         }
         self.advance();
         Ok(Stmt::Print(Print {
@@ -192,7 +191,7 @@ impl Parser {
         }))
     }
 
-    fn parse_return_stmt(&mut self) -> Result<Stmt, Error> {
+    fn parse_return_stmt(&mut self) -> Result<Stmt, (ParseError, Token)> {
         let value = if !self.check(TokenType::Semicolon) {
             Some(self.parse_expr()?)
         } else {
@@ -200,28 +199,28 @@ impl Parser {
         };
 
         if !self.check(TokenType::Semicolon) {
-            return Err(Error::ExpectedSemicolonAfterReturn {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedSemicolonAfterReturn,
+                self.peek().clone(),
+            ));
         }
         self.advance();
         Ok(Stmt::Return(Return { value }))
     }
 
-    fn parse_while_stmt(&mut self) -> Result<Stmt, Error> {
+    fn parse_while_stmt(&mut self) -> Result<Stmt, (ParseError, Token)> {
         if !self.check(TokenType::LeftParen) {
-            return Err(Error::ExpectedLeftParenAfterWhile {
-                token: self.peek().clone(),
-            });
+            return Err((ParseError::ExpectedLeftParenAfterWhile, self.peek().clone()));
         }
         self.advance();
 
         let condition = self.parse_expr()?;
 
         if !self.check(TokenType::RightParen) {
-            return Err(Error::ExpectedRightParenAfterWhileCondition {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedRightParenAfterWhileCondition,
+                self.peek().clone(),
+            ));
         }
         self.advance();
 
@@ -233,11 +232,9 @@ impl Parser {
         }))
     }
 
-    fn parse_var_decl(&mut self) -> Result<Stmt, Error> {
+    fn parse_var_decl(&mut self) -> Result<Stmt, (ParseError, Token)> {
         if !self.check(TokenType::Identifier) {
-            return Err(Error::ExpectedVariableName {
-                token: self.peek().clone(),
-            });
+            return Err((ParseError::ExpectedVariableName, self.peek().clone()));
         }
         let name = self.advance().lexeme.clone();
         let initializer = if self.matches(&[TokenType::Equal]) {
@@ -247,34 +244,36 @@ impl Parser {
         };
 
         if !self.check(TokenType::Semicolon) {
-            return Err(Error::ExpectedSemicolonAfterExpression {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedSemicolonAfterExpression,
+                self.peek().clone(),
+            ));
         }
         self.advance();
         Ok(Stmt::VarDecl(VarDecl { name, initializer }))
     }
 
-    fn parse_expr_stmt(&mut self) -> Result<Stmt, Error> {
+    fn parse_expr_stmt(&mut self) -> Result<Stmt, (ParseError, Token)> {
         let expr = self.parse_expr()?;
         if !self.check(TokenType::Semicolon) {
-            return Err(Error::ExpectedSemicolonAfterExpression {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedSemicolonAfterExpression,
+                self.peek().clone(),
+            ));
         }
         self.advance();
         Ok(Stmt::Expr(expr))
     }
 
-    fn parse_function(&mut self, kind: FunctionKind) -> Result<Stmt, Error> {
+    fn parse_function(&mut self, kind: FunctionKind) -> Result<Stmt, (ParseError, Token)> {
         if !self.check(TokenType::Identifier) {
             let token = self.peek().clone();
             match kind {
                 FunctionKind::Function => {
-                    return Err(Error::ExpectedFunctionName { token });
+                    return Err((ParseError::ExpectedFunctionName, token));
                 }
                 FunctionKind::Method => {
-                    return Err(Error::ExpectedMethodName { token });
+                    return Err((ParseError::ExpectedMethodName, token));
                 }
             }
         }
@@ -283,8 +282,10 @@ impl Parser {
         if !self.check(TokenType::LeftParen) {
             let token = self.peek().clone();
             return match kind {
-                FunctionKind::Function => Err(Error::ExpectedLeftParenAfterFunctionName { token }),
-                FunctionKind::Method => Err(Error::ExpectedLeftParenAfterMethodName { token }),
+                FunctionKind::Function => {
+                    Err((ParseError::ExpectedLeftParenAfterFunctionName, token))
+                }
+                FunctionKind::Method => Err((ParseError::ExpectedLeftParenAfterMethodName, token)),
             };
         }
         self.advance();
@@ -293,15 +294,11 @@ impl Parser {
         if !self.check(TokenType::RightParen) {
             loop {
                 if params.len() >= 255 {
-                    return Err(Error::TooManyParameters {
-                        token: self.peek().clone(),
-                    });
+                    return Err((ParseError::TooManyParameters, self.peek().clone()));
                 }
 
                 if !self.check(TokenType::Identifier) {
-                    return Err(Error::ExpectedParameterName {
-                        token: self.peek().clone(),
-                    });
+                    return Err((ParseError::ExpectedParameterName, self.peek().clone()));
                 }
                 params.push(self.advance().lexeme.clone());
 
@@ -312,9 +309,10 @@ impl Parser {
         }
 
         if !self.check(TokenType::RightParen) {
-            return Err(Error::ExpectedRightParenAfterParameters {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedRightParenAfterParameters,
+                self.peek().clone(),
+            ));
         }
         self.advance();
 
@@ -322,10 +320,10 @@ impl Parser {
             let token = self.peek().clone();
             match kind {
                 FunctionKind::Function => {
-                    return Err(Error::ExpectedLeftBraceAfterFunction { token });
+                    return Err((ParseError::ExpectedLeftBraceAfterFunction, token));
                 }
                 FunctionKind::Method => {
-                    return Err(Error::ExpectedLeftBraceAfterMethod { token });
+                    return Err((ParseError::ExpectedLeftBraceAfterMethod, token));
                 }
             }
         }
@@ -336,7 +334,7 @@ impl Parser {
         Ok(Stmt::Function(Arc::new(Function { name, params, body })))
     }
 
-    fn parse_block(&mut self) -> Result<Vec<Stmt>, Error> {
+    fn parse_block(&mut self) -> Result<Vec<Stmt>, (ParseError, Token)> {
         let mut stmts = vec![];
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
             let stmt = self.parse_declaration();
@@ -350,15 +348,16 @@ impl Parser {
         }
 
         if !self.check(TokenType::RightBrace) {
-            return Err(Error::ExpectedRightBraceAfterBlock {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedRightBraceAfterBlock,
+                self.peek().clone(),
+            ));
         }
         self.advance();
         Ok(stmts)
     }
 
-    fn parse_assignment(&mut self) -> Result<Expr, Error> {
+    fn parse_assignment(&mut self) -> Result<Expr, (ParseError, Token)> {
         let expr = self.parse_or()?;
 
         if self.matches(&[TokenType::Equal]) {
@@ -372,15 +371,13 @@ impl Parser {
                 }));
             }
 
-            return Err(Error::InvalidAssignmentTarget {
-                token: equals.clone(),
-            });
+            return Err((ParseError::InvalidAssignmentTarget, equals.clone()));
         }
 
         Ok(expr)
     }
 
-    fn parse_or(&mut self) -> Result<Expr, Error> {
+    fn parse_or(&mut self) -> Result<Expr, (ParseError, Token)> {
         let mut expr = self.parse_and()?;
 
         while self.matches(&[TokenType::Or]) {
@@ -396,7 +393,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_and(&mut self) -> Result<Expr, Error> {
+    fn parse_and(&mut self) -> Result<Expr, (ParseError, Token)> {
         let mut expr = self.parse_equality()?;
 
         while self.matches(&[TokenType::And]) {
@@ -412,7 +409,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_equality(&mut self) -> Result<Expr, Error> {
+    fn parse_equality(&mut self) -> Result<Expr, (ParseError, Token)> {
         let mut expr = self.parse_comparison()?;
 
         while self.matches(&[TokenType::BangEqual, TokenType::EqualEqual]) {
@@ -428,7 +425,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_comparison(&mut self) -> Result<Expr, Error> {
+    fn parse_comparison(&mut self) -> Result<Expr, (ParseError, Token)> {
         let mut expr = self.parse_term()?;
 
         while self.matches(&[
@@ -449,7 +446,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_term(&mut self) -> Result<Expr, Error> {
+    fn parse_term(&mut self) -> Result<Expr, (ParseError, Token)> {
         let mut expr = self.parse_factor()?;
 
         while self.matches(&[TokenType::Minus, TokenType::Plus]) {
@@ -465,7 +462,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_factor(&mut self) -> Result<Expr, Error> {
+    fn parse_factor(&mut self) -> Result<Expr, (ParseError, Token)> {
         let mut expr = self.parse_unary()?;
 
         while self.matches(&[TokenType::Slash, TokenType::Star]) {
@@ -481,7 +478,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_unary(&mut self) -> Result<Expr, Error> {
+    fn parse_unary(&mut self) -> Result<Expr, (ParseError, Token)> {
         if self.matches(&[TokenType::Bang, TokenType::Minus]) {
             let op = self.previous().ty;
             let right = self.parse_unary()?;
@@ -494,15 +491,13 @@ impl Parser {
         return self.parse_call();
     }
 
-    fn finish_call(&mut self, callee: Expr) -> Result<Expr, Error> {
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr, (ParseError, Token)> {
         let mut args = vec![];
 
         if !self.check(TokenType::RightParen) {
             loop {
                 if args.len() >= 255 {
-                    return Err(Error::TooManyArguments {
-                        token: self.peek().clone(),
-                    });
+                    return Err((ParseError::TooManyArguments, self.peek().clone()));
                 }
 
                 args.push(self.parse_expr()?);
@@ -513,9 +508,10 @@ impl Parser {
         }
 
         if !self.check(TokenType::RightParen) {
-            return Err(Error::ExpectedRightParenAfterArguments {
-                token: self.peek().clone(),
-            });
+            return Err((
+                ParseError::ExpectedRightParenAfterArguments,
+                self.peek().clone(),
+            ));
         }
         self.advance();
 
@@ -525,7 +521,7 @@ impl Parser {
         }))
     }
 
-    fn parse_call(&mut self) -> Result<Expr, Error> {
+    fn parse_call(&mut self) -> Result<Expr, (ParseError, Token)> {
         let mut expr = self.parse_primary()?;
 
         loop {
@@ -539,7 +535,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_primary(&mut self) -> Result<Expr, Error> {
+    fn parse_primary(&mut self) -> Result<Expr, (ParseError, Token)> {
         if self.matches(&[TokenType::False]) {
             return Ok(Expr::Literal(Literal::Bool(false)));
         }
@@ -573,9 +569,7 @@ impl Parser {
         if self.matches(&[TokenType::LeftParen]) {
             let expr = self.parse_expr()?;
             if !self.check(TokenType::RightParen) {
-                return Err(Error::ExpectedRightParenAfterExpr {
-                    token: self.peek().clone(),
-                });
+                return Err((ParseError::ExpectedRightParenAfterExpr, self.peek().clone()));
             }
             self.advance();
             return Ok(Expr::Grouping(Grouping {
@@ -583,7 +577,7 @@ impl Parser {
             }));
         }
 
-        todo!("expected expression");
+        todo!("Expected expression");
     }
 
     fn matches(&mut self, tys: &[TokenType]) -> bool {
@@ -651,4 +645,95 @@ impl Parser {
 enum FunctionKind {
     Function,
     Method,
+}
+
+pub enum ParseError {
+    ExpectedRightParenAfterExpr,
+    ExpectedSemicolonAfterExpression,
+    ExpectedVariableName,
+    InvalidAssignmentTarget,
+    ExpectedRightBraceAfterBlock,
+    ExpectedLeftParenAfterIf,
+    ExpectedRightParenAfterIfCondition,
+    ExpectedLeftParenAfterWhile,
+    ExpectedRightParenAfterWhileCondition,
+    ExpectedLeftParenAfterFor,
+    ExpectedSemicolonAfterLoopCondition,
+    ExpectedRightParenAfterForLoop,
+    TooManyArguments,
+    ExpectedRightParenAfterArguments,
+    ExpectedFunctionName,
+    ExpectedMethodName,
+    ExpectedLeftParenAfterFunctionName,
+    ExpectedLeftParenAfterMethodName,
+    TooManyParameters,
+    ExpectedParameterName,
+    ExpectedRightParenAfterParameters,
+    ExpectedLeftBraceAfterFunction,
+    ExpectedLeftBraceAfterMethod,
+    ExpectedSemicolonAfterReturn,
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ParseError::ExpectedRightParenAfterExpr => "Expected ')' after expression".to_string(),
+            ParseError::ExpectedSemicolonAfterExpression => {
+                "Expected ';' after expression".to_string()
+            }
+            ParseError::ExpectedVariableName => "Expected variable name".to_string(),
+            ParseError::InvalidAssignmentTarget => "Invalid assignment target".to_string(),
+            ParseError::ExpectedRightBraceAfterBlock => "Expected '}' after block".to_string(),
+            ParseError::ExpectedLeftParenAfterIf => "Expected '(' after 'if'".to_string(),
+            ParseError::ExpectedRightParenAfterIfCondition => {
+                "Expected ')' after if condition".to_string()
+            }
+            ParseError::ExpectedLeftParenAfterWhile => "Expected '(' after 'while'".to_string(),
+            ParseError::ExpectedRightParenAfterWhileCondition => {
+                "Expected ')' after while condition".to_string()
+            }
+            ParseError::ExpectedLeftParenAfterFor => "Expected '(' after 'for'".to_string(),
+            ParseError::ExpectedSemicolonAfterLoopCondition => {
+                "Expected ';' after loop condition".to_string()
+            }
+            ParseError::ExpectedRightParenAfterForLoop => "Expected ')' after for loop".to_string(),
+            ParseError::TooManyArguments => "Cannot have more than 255 arguments".to_string(),
+            ParseError::ExpectedRightParenAfterArguments => {
+                "Expected ')' after arguments".to_string()
+            }
+            ParseError::ExpectedFunctionName => "Expected function name".to_string(),
+            ParseError::ExpectedMethodName => "Expected method name".to_string(),
+            ParseError::ExpectedLeftParenAfterFunctionName => {
+                "Expected '(' after function name".to_string()
+            }
+            ParseError::ExpectedLeftParenAfterMethodName => {
+                "Expected '(' after method name".to_string()
+            }
+            ParseError::TooManyParameters => "Cannot have more than 255 parameters".to_string(),
+            ParseError::ExpectedParameterName => "Expected parameter name".to_string(),
+            ParseError::ExpectedRightParenAfterParameters => {
+                "Expected ')' after parameters".to_string()
+            }
+            ParseError::ExpectedLeftBraceAfterFunction => "Expected '{' after function".to_string(),
+            ParseError::ExpectedLeftBraceAfterMethod => "Expected '{' after method".to_string(),
+            ParseError::ExpectedSemicolonAfterReturn => "Expected ';' after return".to_string(),
+        };
+        write!(f, "{}", s)
+    }
+}
+
+pub fn report_parse_errors(errors: Vec<(ParseError, Token)>) {
+    for (error, token) in errors {
+        match token.ty {
+            TokenType::EOF => {
+                println!("[line {}] Error at end of file: {}", token.line, error);
+            }
+            _ => {
+                println!(
+                    "[line {}] Error at '{}': {}",
+                    token.line, token.lexeme, error
+                );
+            }
+        }
+    }
 }

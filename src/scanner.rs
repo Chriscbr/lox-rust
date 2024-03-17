@@ -1,7 +1,6 @@
-use crate::{
-    error::Error,
-    token::{Token, TokenType, KEYWORDS},
-};
+use std::fmt::Display;
+
+use crate::token::{Token, TokenType, KEYWORDS};
 
 #[derive(Debug)]
 pub struct Scanner {
@@ -10,7 +9,7 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
-    errors: Vec<Error>,
+    errors: Vec<(ScannerError, usize)>,
 }
 
 impl Scanner {
@@ -25,7 +24,7 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(mut self) -> (Vec<Token>, Vec<Error>) {
+    pub fn scan_tokens(mut self) -> (Vec<Token>, Vec<(ScannerError, usize)>) {
         while !self.is_at_end() {
             // We are at the beginning of the next lexeme.
             self.start = self.current;
@@ -110,7 +109,7 @@ impl Scanner {
                     self.identifier();
                 } else {
                     self.errors
-                        .push(Error::UnexpectedCharacter { line: self.line });
+                        .push((ScannerError::UnexpectedCharacter, self.line));
                 }
             }
         };
@@ -157,7 +156,7 @@ impl Scanner {
 
         if self.is_at_end() {
             self.errors
-                .push(Error::UnterminatedString { line: self.line });
+                .push((ScannerError::UnterminatedString, self.line));
         }
 
         self.advance(); // The closing ".
@@ -218,5 +217,24 @@ impl Scanner {
 
     fn char_at(&self, idx: usize) -> char {
         return char::from(self.source.as_bytes()[idx]); // unsafe conversion
+    }
+}
+
+#[derive(Debug)]
+pub enum ScannerError {
+    UnexpectedCharacter,
+    UnterminatedString,
+}
+
+impl Display for ScannerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScannerError::UnexpectedCharacter => {
+                write!(f, "Unexpected character.")
+            }
+            ScannerError::UnterminatedString => {
+                write!(f, "Unterminated string.")
+            }
+        }
     }
 }
