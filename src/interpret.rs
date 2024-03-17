@@ -16,6 +16,7 @@ use self::{
 pub struct Interpreter {
     env: Rc<RefCell<Environment>>,
     globals: Rc<RefCell<Environment>>,
+    inside_function: bool,
 }
 
 impl Interpreter {
@@ -32,6 +33,7 @@ impl Interpreter {
         Self {
             env: Rc::new(RefCell::new(Environment::new(Some(globals.clone())))),
             globals,
+            inside_function: false,
         }
     }
 
@@ -103,6 +105,9 @@ impl Interpreter {
     }
 
     fn execute_return(&mut self, r: &Return) -> Result<(), RuntimeError> {
+        if !self.inside_function {
+            return Err(RuntimeError::CannotReturnFromTopLevel);
+        }
         let value = match &r.value {
             Some(expr) => self.expr(expr)?,
             None => RuntimeValue::Nil,
@@ -219,7 +224,10 @@ impl Interpreter {
                 }
 
                 let previous = self.set_current_env(env);
+                let prev_inside_function = self.inside_function;
+                self.inside_function = true;
                 let result = self.execute_block(&f.fun.body, self.env.clone());
+                self.inside_function = prev_inside_function;
                 self.set_current_env(previous);
 
                 match result {
@@ -318,28 +326,32 @@ pub enum RuntimeError {
     InvalidArgumentCount,
     NotCallable,
     AlreadyDefined(String),
+    CannotReturnFromTopLevel,
     ReturnValue(RuntimeValue),
 }
 
 impl std::fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RuntimeError::OperandsMustBeNumbers => write!(f, "Operands must be numbers"),
+            RuntimeError::OperandsMustBeNumbers => write!(f, "Operands must be numbers."),
             RuntimeError::OperandsMustBeTwoNumbersOrTwoStrings => {
-                write!(f, "Operands must be two numbers or two strings")
+                write!(f, "Operands must be two numbers or two strings.")
             }
-            RuntimeError::OperandMustBeNumber => write!(f, "Operand must be a number"),
-            RuntimeError::UndefinedVariable(name) => write!(f, "Undefined variable '{}'", name),
-            RuntimeError::InvalidArgumentCount => write!(f, "Invalid argument count"),
-            RuntimeError::NotCallable => write!(f, "Can only call functions and classes"),
+            RuntimeError::OperandMustBeNumber => write!(f, "Operand must be a number."),
+            RuntimeError::UndefinedVariable(name) => write!(f, "Undefined variable '{}'.", name),
+            RuntimeError::InvalidArgumentCount => write!(f, "Invalid argument count."),
+            RuntimeError::NotCallable => write!(f, "Can only call functions and classes."),
             RuntimeError::AlreadyDefined(name) => {
                 write!(
                     f,
-                    "Already a variable with the name '{}' in this scope",
+                    "Already a variable with the name '{}' in this scope.",
                     name
                 )
             }
-            RuntimeError::ReturnValue(_) => panic!("Unhandled return value runtime error"),
+            RuntimeError::CannotReturnFromTopLevel => {
+                write!(f, "Cannot return from top-level code.")
+            }
+            RuntimeError::ReturnValue(_) => panic!("Internal error: unhandled return value"),
         }
     }
 }
