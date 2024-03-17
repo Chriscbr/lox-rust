@@ -11,6 +11,7 @@ pub enum RuntimeValue {
     Number(f64),
     String(String),
     Function(Function),
+    NativeFunction(Arc<fn(&[RuntimeValue]) -> Result<RuntimeValue, RuntimeError>>),
     Class(Class),
     Instance(Instance),
 }
@@ -110,18 +111,10 @@ impl Display for RuntimeValue {
             }
             RuntimeValue::String(s) => format!("{}", s),
             RuntimeValue::Function(c) => format!("<fn {}>", c.fun.name),
+            RuntimeValue::NativeFunction(_) => format!("<native fn>"),
             RuntimeValue::Class(c) => format!("{}", c.name),
             RuntimeValue::Instance(i) => format!("<instance of {}>", i.class.name),
         };
         write!(f, "{}", s)
     }
-}
-
-pub fn clock(_: &[RuntimeValue]) -> Result<RuntimeValue, RuntimeError> {
-    Ok(RuntimeValue::Number(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs_f64(),
-    ))
 }

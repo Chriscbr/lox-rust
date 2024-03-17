@@ -12,24 +12,26 @@ use self::{env::Environment, value::RuntimeValue};
 
 pub struct Interpreter {
     env: Rc<RefCell<Environment>>,
-    globals: Rc<RefCell<Environment>>,
     inside_function: bool,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         let globals = Rc::new(RefCell::new(Environment::new(None)));
-        // globals.define(
-        //     "clock",
-        //     RuntimeValue::Callable(Callable {
-        //         arity: 0,
-        //         closure: value::clock,
-        //     }),
-        // );
+        globals.borrow_mut().set_global(
+            "clock",
+            RuntimeValue::NativeFunction(Arc::new(|_| {
+                Ok(RuntimeValue::Number(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs_f64(),
+                ))
+            })),
+        );
 
         Self {
             env: globals.clone(),
-            globals,
             inside_function: false,
         }
     }
@@ -255,6 +257,7 @@ impl Interpreter {
 
         match callee {
             RuntimeValue::Function(f) => f.call(self, args),
+            RuntimeValue::NativeFunction(f) => f(&args),
             _ => Err(RuntimeError::NotCallable),
         }
     }
