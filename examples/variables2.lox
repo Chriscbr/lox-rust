@@ -1,3 +1,5 @@
+// allow redeclaration of variables, but only in the global scope
+
 var a = "before";
 print a; // "before".
 var a = "after";

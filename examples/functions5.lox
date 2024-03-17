@@ -1,0 +1,23 @@
+var a = 3;
+fun b() {
+    a = 4;
+}
+fun c() {
+    a = 5;
+}
+print a; // 3
+c();
+print a; // 5
+b();
+print a; // 4
+
+var x = 1;
+
+fun foo() {
+    print x; // 1
+    print y; // 2
+}
+
+var y = 2;
+
+foo();

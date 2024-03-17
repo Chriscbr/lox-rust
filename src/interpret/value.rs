@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, fmt::Display, rc::Rc, sync::Arc};
 
 use super::{env::Environment, Interpreter, RuntimeError};
 
@@ -15,11 +15,20 @@ pub enum RuntimeValue {
     Instance(Instance),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Function {
     pub arity: usize,
     pub fun: Arc<ast::Function>,
     pub closure: Rc<RefCell<Environment>>,
+}
+
+impl Debug for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Function")
+            .field("arity", &self.arity)
+            .field("fun", &self.fun)
+            .finish()
+    }
 }
 
 impl Function {
@@ -40,9 +49,10 @@ impl Function {
             return Err(RuntimeError::InvalidArgumentCount);
         }
 
-        let env = Rc::new(RefCell::new(Environment::new(Some(self.closure.clone()))));
+        let mut env = Rc::new(RefCell::new(Environment::new(Some(self.closure.clone()))));
         for (i, param) in self.fun.params.iter().enumerate() {
-            env.borrow_mut().define(param, args[i].clone())?;
+            let new_env = env.borrow().extend(param, args[i].clone())?;
+            env = Rc::new(RefCell::new(new_env));
         }
 
         let prev_inside_function = interpreter.inside_function;
