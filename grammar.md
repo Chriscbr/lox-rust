@@ -1,6 +1,7 @@
 program        → declaration* EOF ;
 
-declaration    → funDecl
+declaration    → classDecl
+               | funDecl
                | varDecl
                | statement ;
 
@@ -15,6 +16,7 @@ statement      → exprStmt
 block          → "{" declaration* "}" ;
 
 varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+classDecl      → "class" IDENTIFIER "{" function* "}" ;
 
 ifStmt         → "if" "(" expression ")" statement
                ( "else" statement )? ;

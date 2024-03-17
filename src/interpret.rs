@@ -1,17 +1,14 @@
 mod env;
 mod value;
 
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use crate::ast::{
-    Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, If, Literal, Logical, LogicalOp,
-    Print, Return, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
+    Assign, Binary, BinaryOp, Call, Class, Expr, Function, Grouping, If, Literal, Logical,
+    LogicalOp, Print, Return, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
 };
 
-use self::{
-    env::Environment,
-    value::{Callable, RuntimeValue},
-};
+use self::{env::Environment, value::RuntimeValue};
 
 pub struct Interpreter {
     env: Rc<RefCell<Environment>>,
@@ -50,6 +47,7 @@ impl Interpreter {
                 let env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
                 self.execute_block(stmts, env)
             }
+            Stmt::Class(class) => self.execute_class(class),
             Stmt::Expr(expr) => self.execute_expr(expr),
             Stmt::Function(func) => self.execute_function_decl(func),
             Stmt::If(i) => self.execute_if(i),
@@ -67,9 +65,34 @@ impl Interpreter {
     ) -> Result<(), RuntimeError> {
         let previous = std::mem::replace(&mut self.env, env);
         for stmt in stmts {
-            self.execute(stmt)?;
+            match self.execute(stmt) {
+                Ok(_) => {}
+                Err(RuntimeError::ReturnValue(v)) => {
+                    self.env = previous;
+                    return Err(RuntimeError::ReturnValue(v));
+                }
+                Err(e) => {
+                    self.env = previous;
+                    return Err(e);
+                }
+            }
         }
         self.env = previous;
+        Ok(())
+    }
+
+    fn execute_class(&mut self, class: &Class) -> Result<(), RuntimeError> {
+        let mut methods = HashMap::new();
+        for method in &class.methods {
+            let value = RuntimeValue::Function(value::Function::new(
+                method.params.len(),
+                method.clone(),
+                self.env.clone(),
+            ));
+            methods.insert(method.name.clone(), value);
+        }
+        let class_value = RuntimeValue::Class(value::Class::new(class.name.clone(), methods));
+        self.env.borrow_mut().define(&class.name, class_value)?;
         Ok(())
     }
 
@@ -79,7 +102,7 @@ impl Interpreter {
     }
 
     fn execute_function_decl(&mut self, fun: &Arc<Function>) -> Result<(), RuntimeError> {
-        let value = RuntimeValue::Callable(Callable::new(
+        let value = RuntimeValue::Function(value::Function::new(
             fun.params.len(),
             fun.clone(),
             self.env.clone(),
@@ -212,30 +235,7 @@ impl Interpreter {
         }
 
         match callee {
-            RuntimeValue::Callable(f) => {
-                // TODO: support native functions?
-                if args.len() != f.arity {
-                    return Err(RuntimeError::InvalidArgumentCount);
-                }
-
-                let env = Rc::new(RefCell::new(Environment::new(Some(f.closure.clone()))));
-                for (param, arg) in f.fun.params.iter().zip(args) {
-                    env.borrow_mut().define(param, arg)?;
-                }
-
-                let previous = self.set_current_env(env);
-                let prev_inside_function = self.inside_function;
-                self.inside_function = true;
-                let result = self.execute_block(&f.fun.body, self.env.clone());
-                self.inside_function = prev_inside_function;
-                self.set_current_env(previous);
-
-                match result {
-                    Ok(_) => Ok(RuntimeValue::Nil),
-                    Err(RuntimeError::ReturnValue(value)) => Ok(value),
-                    Err(e) => Err(e),
-                }
-            }
+            RuntimeValue::Function(f) => f.call(self, args),
             _ => Err(RuntimeError::NotCallable),
         }
     }
@@ -310,10 +310,6 @@ impl Interpreter {
             (RuntimeValue::Bool(l), RuntimeValue::Bool(r)) => l == r,
             _ => false,
         }
-    }
-
-    fn set_current_env(&mut self, env: Rc<RefCell<Environment>>) -> Rc<RefCell<Environment>> {
-        std::mem::replace(&mut self.env, env)
     }
 }
 

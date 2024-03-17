@@ -5,6 +5,7 @@ use crate::token::TokenType;
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Block(Vec<Stmt>),
+    Class(Class),
     Expr(Expr),
     Function(Arc<Function>),
     If(If),
@@ -26,6 +27,7 @@ impl Display for Stmt {
                 s.push_str("}");
                 s
             }
+            Stmt::Class(c) => format!("{}", c),
             Stmt::Expr(e) => format!("{};", e),
             Stmt::Function(f) => format!("{}", f),
             Stmt::If(i) => format!("{}", i),
@@ -34,6 +36,24 @@ impl Display for Stmt {
             Stmt::VarDecl(v) => format!("{}", v),
             Stmt::While(w) => format!("{}", w),
         };
+        write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Class {
+    pub name: String,
+    pub methods: Vec<Arc<Function>>,
+}
+
+impl Display for Class {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::new();
+        s.push_str(&format!("class {} {{\n", self.name));
+        for method in &self.methods {
+            s.push_str(&format!("{}\n", method));
+        }
+        s.push_str("}");
         write!(f, "{}", s)
     }
 }

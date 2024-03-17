@@ -1,8 +1,8 @@
-use std::{cell::RefCell, fmt::Display, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc, sync::Arc};
 
-use crate::ast::Function;
+use super::{env::Environment, Interpreter, RuntimeError};
 
-use super::{env::Environment, RuntimeError};
+use crate::ast;
 
 #[derive(Debug, Clone)]
 pub enum RuntimeValue {
@@ -10,22 +10,77 @@ pub enum RuntimeValue {
     Bool(bool),
     Number(f64),
     String(String),
-    Callable(Callable),
+    Function(Function),
+    Class(Class),
+    Instance(Instance),
 }
 
 #[derive(Debug, Clone)]
-pub struct Callable {
+pub struct Function {
     pub arity: usize,
-    pub fun: Arc<Function>,
+    pub fun: Arc<ast::Function>,
     pub closure: Rc<RefCell<Environment>>,
 }
 
-impl Callable {
-    pub fn new(arity: usize, fun: Arc<Function>, closure: Rc<RefCell<Environment>>) -> Self {
+impl Function {
+    pub fn new(arity: usize, fun: Arc<ast::Function>, closure: Rc<RefCell<Environment>>) -> Self {
         Self {
             arity,
             fun,
             closure,
+        }
+    }
+
+    pub fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<RuntimeValue>,
+    ) -> Result<RuntimeValue, RuntimeError> {
+        if args.len() != self.arity {
+            return Err(RuntimeError::InvalidArgumentCount);
+        }
+
+        let env = Rc::new(RefCell::new(Environment::new(Some(self.closure.clone()))));
+        for (i, param) in self.fun.params.iter().enumerate() {
+            env.borrow_mut().define(param, args[i].clone())?;
+        }
+
+        let prev_inside_function = interpreter.inside_function;
+        interpreter.inside_function = true;
+        let result = interpreter.execute_block(&self.fun.body, env);
+        interpreter.inside_function = prev_inside_function;
+
+        match result {
+            Ok(_) => Ok(RuntimeValue::Nil),
+            Err(RuntimeError::ReturnValue(value)) => Ok(value),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Class {
+    pub name: String,
+    pub methods: HashMap<String, RuntimeValue>,
+}
+
+impl Class {
+    pub fn new(name: String, methods: HashMap<String, RuntimeValue>) -> Self {
+        Self { name, methods }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Instance {
+    pub class: Arc<Class>,
+    pub fields: HashMap<String, RuntimeValue>,
+}
+
+impl Instance {
+    pub fn new(class: Arc<Class>) -> Self {
+        Self {
+            class,
+            fields: HashMap::new(),
         }
     }
 }
@@ -44,7 +99,9 @@ impl Display for RuntimeValue {
                 }
             }
             RuntimeValue::String(s) => format!("{}", s),
-            RuntimeValue::Callable(c) => format!("<fn {}>", c.fun.name),
+            RuntimeValue::Function(c) => format!("<fn {}>", c.fun.name),
+            RuntimeValue::Class(c) => format!("{}", c.name),
+            RuntimeValue::Instance(i) => format!("<instance of {}>", i.class.name),
         };
         write!(f, "{}", s)
     }

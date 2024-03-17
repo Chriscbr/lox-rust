@@ -2,8 +2,8 @@ use std::{fmt::Display, sync::Arc};
 
 use crate::{
     ast::{
-        Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, If, Literal, Logical, LogicalOp,
-        Print, Return, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
+        Assign, Binary, BinaryOp, Call, Class, Expr, Function, Grouping, If, Literal, Logical,
+        LogicalOp, Print, Return, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
     },
     token::{Token, TokenType},
 };
@@ -48,6 +48,10 @@ impl Parser {
     }
 
     fn parse_declaration(&mut self) -> Result<Stmt, (ParseError, Token)> {
+        if self.matches(&[TokenType::Class]) {
+            return self.parse_class_decl();
+        }
+
         if self.matches(&[TokenType::Fun]) {
             return self.parse_function(FunctionKind::Function);
         }
@@ -57,6 +61,40 @@ impl Parser {
         }
 
         self.parse_stmt()
+    }
+
+    fn parse_class_decl(&mut self) -> Result<Stmt, (ParseError, Token)> {
+        let name = self
+            .consume(TokenType::Identifier, ParseError::ExpectedClassName)?
+            .lexeme
+            .clone();
+
+        self.consume(
+            TokenType::LeftBrace,
+            ParseError::ExpectedLeftBraceAfterClassName,
+        )?;
+
+        let mut methods = vec![];
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            let method = self.parse_function(FunctionKind::Method);
+            match method {
+                Ok(method) => match method {
+                    Stmt::Function(f) => methods.push(f),
+                    _ => unreachable!(),
+                },
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize();
+                }
+            }
+        }
+
+        self.consume(
+            TokenType::RightBrace,
+            ParseError::ExpectedRightBraceAfterClass,
+        )?;
+
+        Ok(Stmt::Class(Class { name, methods }))
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, (ParseError, Token)> {
@@ -623,6 +661,9 @@ pub enum ParseError {
     ExpectedLeftBraceAfterFunction,
     ExpectedLeftBraceAfterMethod,
     ExpectedSemicolonAfterReturn,
+    ExpectedClassName,
+    ExpectedLeftBraceAfterClassName,
+    ExpectedRightBraceAfterClass,
 }
 
 impl Display for ParseError {
@@ -668,6 +709,11 @@ impl Display for ParseError {
             ParseError::ExpectedLeftBraceAfterFunction => "Expected '{' after function".to_string(),
             ParseError::ExpectedLeftBraceAfterMethod => "Expected '{' after method".to_string(),
             ParseError::ExpectedSemicolonAfterReturn => "Expected ';' after return".to_string(),
+            ParseError::ExpectedClassName => "Expected class name".to_string(),
+            ParseError::ExpectedLeftBraceAfterClassName => {
+                "Expected '{' after class name".to_string()
+            }
+            ParseError::ExpectedRightBraceAfterClass => "Expected '}' after class".to_string(),
         };
         write!(f, "{}", s)
     }
