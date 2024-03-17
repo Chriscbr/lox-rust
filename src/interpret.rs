@@ -42,8 +42,6 @@ impl Interpreter {
     }
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
-        // dbg!(&stmt);
-        // dbg!(&self.env);
         match stmt {
             Stmt::Block(stmts) => {
                 let env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
@@ -57,8 +55,7 @@ impl Interpreter {
             Stmt::Return(r) => self.execute_return(r),
             Stmt::VarDecl(var_decl) => self.execute_var_decl(var_decl),
             Stmt::While(w) => self.execute_while(w),
-        }?;
-        Ok(())
+        }
     }
 
     fn execute_block(
@@ -106,23 +103,6 @@ impl Interpreter {
     }
 
     fn execute_function_decl(&mut self, fun: &Arc<Function>) -> Result<(), RuntimeError> {
-        // let func = RuntimeValue::Function(value::Function::new(
-        //     fun.params.len(),
-        //     fun.clone(),
-        //     self.env.clone(), // this will be replaced when the function is called
-        // ));
-        // let new_env = self.env.borrow().define(&fun.name, func)?;
-        // self.env = Rc::new(RefCell::new(new_env));
-        // self.env.borrow().assign(&fun.name, func)?;
-        // let func = self.env.borrow().get(&fun.name)?;
-        // match func {
-        //     RuntimeValue::Function(mut f) => {
-        //         f.closure = self.env.clone();
-        //     }
-        //     _ => unreachable!(),
-        // }
-        // Ok(())
-
         let func = RuntimeValue::Function(value::Function::new(
             fun.params.len(),
             fun.clone(),
@@ -143,24 +123,6 @@ impl Interpreter {
             _ => unreachable!(),
         }
         Ok(())
-
-        // let temp = RuntimeValue::Nil;
-        // let new_env = self.env.borrow().extend(&fun.name, temp)?;
-        // self.env = Rc::new(RefCell::new(new_env));
-        // let func = RuntimeValue::Function(value::Function::new(
-        //     fun.params.len(),
-        //     fun.clone(),
-        //     self.env.clone(),
-        // ));
-        // self.env.borrow().assign(&fun.name, func)?;
-        // let func = self.env.borrow().get(&fun.name)?;
-        // match func {
-        //     RuntimeValue::Function(mut f) => {
-        //         f.closure = self.env.clone();
-        //     }
-        //     _ => unreachable!(),
-        // }
-        // Ok(())
     }
 
     fn execute_if(&mut self, i: &If) -> Result<(), RuntimeError> {
@@ -342,22 +304,13 @@ impl Interpreter {
     }
 
     fn variable(&self, variable: &Variable) -> Result<RuntimeValue, RuntimeError> {
-        self.lookup_variable(&variable.name)
+        self.env.borrow().get(&variable.name)
     }
 
     fn assign(&mut self, assign: &Assign) -> Result<RuntimeValue, RuntimeError> {
         let value = self.expr(&assign.value)?;
         self.assign_variable(&assign.name, value.clone())?;
         Ok(value)
-    }
-
-    fn lookup_variable(&self, name: &str) -> Result<RuntimeValue, RuntimeError> {
-        self.env.borrow().get(name)
-        // if let Ok(value) = self.env.borrow().get(name) {
-        //     Ok(value)
-        // } else {
-        //     self.globals.borrow().get(name)
-        // }
     }
 
     fn assign_variable(&mut self, name: &str, value: RuntimeValue) -> Result<(), RuntimeError> {
