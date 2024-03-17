@@ -10,6 +10,7 @@ pub enum Stmt {
     If(If),
     Print(Expr),
     VarDecl(VarDecl),
+    While(While),
 }
 
 impl Display for Stmt {
@@ -29,6 +30,7 @@ impl Display for Stmt {
             Stmt::If(i) => format!("{}", i),
             Stmt::Print(e) => format!("print {};", e),
             Stmt::VarDecl(v) => format!("{}", v),
+            Stmt::While(w) => format!("{}", w),
         };
         write!(f, "{}", s)
     }
@@ -93,6 +95,18 @@ impl Display for VarDecl {
             None => format!("var {};", self.name),
         };
         write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct While {
+    pub condition: Box<Expr>,
+    pub body: Box<Stmt>,
+}
+
+impl Display for While {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "while ({}) {}", self.condition, self.body)
     }
 }
 

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     ast::{
         Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, If, Literal, Logical, LogicalOp,
-        Stmt, Unary, UnaryOp, VarDecl, Variable,
+        Stmt, Unary, UnaryOp, VarDecl, Variable, While,
     },
     error::Error,
     token::{Token, TokenType},
@@ -69,6 +69,10 @@ impl Parser {
             return self.parse_print_stmt();
         }
 
+        if self.matches(&[TokenType::While]) {
+            return self.parse_while_stmt();
+        }
+
         if self.matches(&[TokenType::LeftBrace]) {
             return Ok(Stmt::Block(self.parse_block()?));
         }
@@ -116,6 +120,31 @@ impl Parser {
         }
         self.advance();
         Ok(Stmt::Print(expr))
+    }
+
+    fn parse_while_stmt(&mut self) -> Result<Stmt, Error> {
+        if !self.check(TokenType::LeftParen) {
+            return Err(Error::ExpectedLeftParenAfterWhile {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+
+        let condition = self.parse_expr()?;
+
+        if !self.check(TokenType::RightParen) {
+            return Err(Error::ExpectedRightParenAfterWhileCondition {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+
+        let body = self.parse_stmt()?;
+
+        Ok(Stmt::While(While {
+            condition: Box::new(condition),
+            body: Box::new(body),
+        }))
     }
 
     fn parse_var_decl(&mut self) -> Result<Stmt, Error> {

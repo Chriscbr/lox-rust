@@ -13,6 +13,8 @@ pub enum Error {
     ExpectedRightBraceAfterBlock { token: Token },
     ExpectedLeftParenAfterIf { token: Token },
     ExpectedRightParenAfterIfCondition { token: Token },
+    ExpectedLeftParenAfterWhile { token: Token },
+    ExpectedRightParenAfterWhileCondition { token: Token },
     TooManyArguments { token: Token },
     ExpectedRightParenAfterArguments { token: Token },
     ExpectedFunctionName { token: Token },
@@ -102,6 +104,26 @@ pub fn report_errors(errors: &[Error]) {
                 ),
                 _ => println!(
                     "[line {}] Error at '{}': Expected ')' after if condition.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedLeftParenAfterWhile { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected '(' after 'while'.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected '(' after 'while'.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedRightParenAfterWhileCondition { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected ')' after while condition.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected ')' after while condition.",
                     token.line, token.lexeme
                 ),
             },

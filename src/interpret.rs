@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::ast::{
     Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, If, Literal, Logical, LogicalOp,
-    Stmt, Unary, UnaryOp, VarDecl, Variable,
+    Stmt, Unary, UnaryOp, VarDecl, Variable, While,
 };
 
 use self::{
@@ -44,16 +44,26 @@ impl Interpreter {
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
+            Stmt::Block(stmts) => {
+                let env = Environment::new_enclosing(&self.env);
+                self.execute_block(stmts, env)
+            }
             Stmt::Expr(expr) => self.execute_expr(expr),
             Stmt::Function(func) => self.execute_function_decl(func),
             Stmt::If(i) => self.execute_if(i),
             Stmt::Print(expr) => self.execute_print(expr),
             Stmt::VarDecl(var_decl) => self.execute_var_decl(var_decl),
-            Stmt::Block(stmts) => {
-                let env = Environment::new_enclosing(&self.env);
-                self.execute_block(stmts, env)
-            }
+            Stmt::While(w) => self.execute_while(w),
         }
+    }
+
+    fn execute_block(&mut self, stmts: &[Stmt], env: Environment) -> Result<(), RuntimeError> {
+        let previous = std::mem::replace(&mut self.env, env);
+        for stmt in stmts {
+            self.execute(stmt)?;
+        }
+        self.env = previous;
+        Ok(())
     }
 
     fn execute_function_decl(&mut self, fun: &Arc<Function>) -> Result<(), RuntimeError> {
@@ -92,12 +102,12 @@ impl Interpreter {
         Ok(())
     }
 
-    fn execute_block(&mut self, stmts: &[Stmt], env: Environment) -> Result<(), RuntimeError> {
-        let previous = std::mem::replace(&mut self.env, env);
-        for stmt in stmts {
-            self.execute(stmt)?;
+    fn execute_while(&mut self, w: &While) -> Result<(), RuntimeError> {
+        let mut cond = self.expr(&w.condition)?;
+        while self.is_truthy(&cond) {
+            self.execute(&w.body)?;
+            cond = self.expr(&w.condition)?;
         }
-        self.env = previous;
         Ok(())
     }
 
