@@ -61,6 +61,10 @@ impl Parser {
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, Error> {
+        if self.matches(&[TokenType::For]) {
+            return self.parse_for_stmt();
+        }
+
         if self.matches(&[TokenType::If]) {
             return self.parse_if_stmt();
         }
@@ -78,6 +82,66 @@ impl Parser {
         }
 
         self.parse_expr_stmt()
+    }
+
+    fn parse_for_stmt(&mut self) -> Result<Stmt, Error> {
+        if !self.check(TokenType::LeftParen) {
+            return Err(Error::ExpectedLeftParenAfterFor {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+
+        let initializer = if self.matches(&[TokenType::Semicolon]) {
+            None
+        } else if self.matches(&[TokenType::Var]) {
+            Some(self.parse_var_decl()?)
+        } else {
+            Some(self.parse_expr_stmt()?)
+        };
+
+        let condition = if !self.check(TokenType::Semicolon) {
+            self.parse_expr()?
+        } else {
+            Expr::Literal(Literal::Bool(true))
+        };
+
+        if !self.check(TokenType::Semicolon) {
+            return Err(Error::ExpectedSemicolonAfterLoopCondition {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+
+        let increment = if !self.check(TokenType::RightParen) {
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+
+        if !self.check(TokenType::RightParen) {
+            return Err(Error::ExpectedRightParenAfterForLoop {
+                token: self.peek().clone(),
+            });
+        }
+        self.advance();
+
+        let mut body = self.parse_stmt()?;
+
+        if let Some(increment) = increment {
+            body = Stmt::Block(vec![body, Stmt::Expr(increment)]);
+        }
+
+        body = Stmt::While(While {
+            condition: Box::new(condition),
+            body: Box::new(body),
+        });
+
+        if let Some(initializer) = initializer {
+            body = Stmt::Block(vec![initializer, body]);
+        }
+
+        Ok(body)
     }
 
     fn parse_if_stmt(&mut self) -> Result<Stmt, Error> {

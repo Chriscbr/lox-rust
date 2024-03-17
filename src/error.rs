@@ -15,6 +15,9 @@ pub enum Error {
     ExpectedRightParenAfterIfCondition { token: Token },
     ExpectedLeftParenAfterWhile { token: Token },
     ExpectedRightParenAfterWhileCondition { token: Token },
+    ExpectedLeftParenAfterFor { token: Token },
+    ExpectedSemicolonAfterLoopCondition { token: Token },
+    ExpectedRightParenAfterForLoop { token: Token },
     TooManyArguments { token: Token },
     ExpectedRightParenAfterArguments { token: Token },
     ExpectedFunctionName { token: Token },
@@ -124,6 +127,36 @@ pub fn report_errors(errors: &[Error]) {
                 ),
                 _ => println!(
                     "[line {}] Error at '{}': Expected ')' after while condition.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedLeftParenAfterFor { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected '(' after 'for'.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected '(' after 'for'.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedSemicolonAfterLoopCondition { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected ';' after loop condition.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected ';' after loop condition.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedRightParenAfterForLoop { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected ')' after for loop.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected ')' after for loop.",
                     token.line, token.lexeme
                 ),
             },

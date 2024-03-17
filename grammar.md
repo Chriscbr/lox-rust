@@ -5,8 +5,10 @@ declaration    → funDecl
                | statement ;
 
 statement      → exprStmt
+               | forStmt
                | ifStmt
                | printStmt
+               | whileStmt
                | block ;
 
 block          → "{" declaration* "}" ;
@@ -18,6 +20,8 @@ ifStmt         → "if" "(" expression ")" statement
 
 exprStmt       → expression ";" ;
 printStmt      → "print" expression ";" ;
+
+whileStmt      → "while" "(" expression ")" statement ;
 
 expression     → assignment ;
 assignment     → IDENTIFIER "=" assignment

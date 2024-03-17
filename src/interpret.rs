@@ -1,7 +1,7 @@
 mod env;
 mod value;
 
-use std::sync::Arc;
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use crate::ast::{
     Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, If, Literal, Logical, LogicalOp,
@@ -14,13 +14,13 @@ use self::{
 };
 
 pub struct Interpreter {
-    env: Environment,
-    globals: Environment,
+    env: Rc<RefCell<Environment>>,
+    globals: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        let globals = Environment::new();
+        let globals = Rc::new(RefCell::new(Environment::new(None)));
         // globals.define(
         //     "clock",
         //     RuntimeValue::Callable(Callable {
@@ -30,7 +30,7 @@ impl Interpreter {
         // );
 
         Self {
-            env: Environment::new_enclosing(&globals),
+            env: Rc::new(RefCell::new(Environment::new(Some(globals.clone())))),
             globals,
         }
     }
@@ -45,7 +45,7 @@ impl Interpreter {
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
             Stmt::Block(stmts) => {
-                let env = Environment::new_enclosing(&self.env);
+                let env = Rc::new(RefCell::new(Environment::new(Some(self.env.clone()))));
                 self.execute_block(stmts, env)
             }
             Stmt::Expr(expr) => self.execute_expr(expr),
@@ -57,7 +57,11 @@ impl Interpreter {
         }
     }
 
-    fn execute_block(&mut self, stmts: &[Stmt], env: Environment) -> Result<(), RuntimeError> {
+    fn execute_block(
+        &mut self,
+        stmts: &[Stmt],
+        env: Rc<RefCell<Environment>>,
+    ) -> Result<(), RuntimeError> {
         let previous = std::mem::replace(&mut self.env, env);
         for stmt in stmts {
             self.execute(stmt)?;
@@ -68,7 +72,7 @@ impl Interpreter {
 
     fn execute_function_decl(&mut self, fun: &Arc<Function>) -> Result<(), RuntimeError> {
         let value = RuntimeValue::Callable(Callable::new(fun.params.len(), fun.clone()));
-        self.env.define(&fun.name, value);
+        self.env.borrow_mut().define(&fun.name, value)?;
         Ok(())
     }
 
@@ -98,7 +102,7 @@ impl Interpreter {
             Some(expr) => self.expr(expr)?,
             None => RuntimeValue::Nil,
         };
-        self.env.define(&var_decl.name, value);
+        self.env.borrow_mut().define(&var_decl.name, value)?;
         Ok(())
     }
 
@@ -196,9 +200,9 @@ impl Interpreter {
                     return Err(RuntimeError::InvalidArgumentCount);
                 }
 
-                let mut env = Environment::new_enclosing(&self.globals);
+                let env = Rc::new(RefCell::new(Environment::new(Some(self.globals.clone()))));
                 for (param, arg) in f.fun.params.iter().zip(args) {
-                    env.define(param, arg);
+                    env.borrow_mut().define(param, arg)?;
                 }
 
                 let previous = self.set_current_env(env);
@@ -257,12 +261,12 @@ impl Interpreter {
     }
 
     fn variable(&self, variable: &Variable) -> Result<RuntimeValue, RuntimeError> {
-        self.env.get(&variable.name)
+        self.env.borrow().get(&variable.name)
     }
 
     fn assign(&mut self, assign: &Assign) -> Result<RuntimeValue, RuntimeError> {
         let value = self.expr(&assign.value)?;
-        self.env.assign(&assign.name, value.clone())?;
+        self.env.borrow_mut().assign(&assign.name, value.clone())?;
         Ok(value)
     }
 
@@ -284,7 +288,7 @@ impl Interpreter {
         }
     }
 
-    fn set_current_env(&mut self, env: Environment) -> Environment {
+    fn set_current_env(&mut self, env: Rc<RefCell<Environment>>) -> Rc<RefCell<Environment>> {
         std::mem::replace(&mut self.env, env)
     }
 }
@@ -297,6 +301,7 @@ pub enum RuntimeError {
     UndefinedVariable(String),
     InvalidArgumentCount,
     NotCallable,
+    AlreadyDefined(String),
 }
 
 impl std::fmt::Display for RuntimeError {
@@ -310,6 +315,13 @@ impl std::fmt::Display for RuntimeError {
             RuntimeError::UndefinedVariable(name) => write!(f, "Undefined variable '{}'", name),
             RuntimeError::InvalidArgumentCount => write!(f, "Invalid argument count"),
             RuntimeError::NotCallable => write!(f, "Can only call functions and classes"),
+            RuntimeError::AlreadyDefined(name) => {
+                write!(
+                    f,
+                    "Already a variable with the name '{}' in this scope",
+                    name
+                )
+            }
         }
     }
 }

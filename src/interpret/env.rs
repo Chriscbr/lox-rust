@@ -1,30 +1,27 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use super::{value::RuntimeValue, RuntimeError};
 
 #[derive(Debug, Clone)]
 pub struct Environment {
     values: HashMap<String, RuntimeValue>,
-    enclosing: Option<Box<Environment>>,
+    enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
-    pub fn new() -> Self {
+    pub fn new(enclosing: Option<Rc<RefCell<Environment>>>) -> Self {
         Self {
             values: HashMap::new(),
-            enclosing: None,
+            enclosing,
         }
     }
 
-    pub fn new_enclosing(enclosing: &Environment) -> Self {
-        Self {
-            values: HashMap::new(),
-            enclosing: Some(Box::new(enclosing.clone())),
+    pub fn define(&mut self, name: &str, value: RuntimeValue) -> Result<(), RuntimeError> {
+        if self.values.contains_key(name) {
+            return Err(RuntimeError::AlreadyDefined(name.to_string()));
         }
-    }
-
-    pub fn define(&mut self, name: &str, value: RuntimeValue) {
         self.values.insert(name.to_string(), value);
+        Ok(())
     }
 
     pub fn get(&self, name: &str) -> Result<RuntimeValue, RuntimeError> {
@@ -33,7 +30,7 @@ impl Environment {
         }
 
         if let Some(enclosing) = &self.enclosing {
-            return enclosing.get(name);
+            return enclosing.borrow().get(name);
         }
 
         Err(RuntimeError::UndefinedVariable(name.to_string()))
@@ -41,12 +38,14 @@ impl Environment {
 
     pub fn assign(&mut self, name: &str, value: RuntimeValue) -> Result<(), RuntimeError> {
         if self.values.contains_key(name) {
+            // let container = self.values.get_mut(name).unwrap();
+            // *container = Box::new(value);
             self.values.insert(name.to_string(), value);
             return Ok(());
         }
 
         if let Some(enclosing) = &mut self.enclosing {
-            return enclosing.assign(name, value);
+            return enclosing.borrow_mut().assign(name, value);
         }
 
         Err(RuntimeError::UndefinedVariable(name.to_string()))
