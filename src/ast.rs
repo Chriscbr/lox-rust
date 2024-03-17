@@ -4,20 +4,17 @@ use crate::token::TokenType;
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
+    Block(Vec<Stmt>),
     Expr(Expr),
     Function(Arc<Function>),
+    If(If),
     Print(Expr),
     VarDecl(VarDecl),
-    Block(Vec<Stmt>),
 }
 
 impl Display for Stmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            Stmt::Expr(e) => format!("{};", e),
-            Stmt::Function(f) => format!("{}", f),
-            Stmt::Print(e) => format!("print {};", e),
-            Stmt::VarDecl(v) => format!("{}", v),
             Stmt::Block(stmts) => {
                 let mut s = String::new();
                 s.push_str("{\n");
@@ -27,6 +24,11 @@ impl Display for Stmt {
                 s.push_str("}");
                 s
             }
+            Stmt::Expr(e) => format!("{};", e),
+            Stmt::Function(f) => format!("{}", f),
+            Stmt::If(i) => format!("{}", i),
+            Stmt::Print(e) => format!("print {};", e),
+            Stmt::VarDecl(v) => format!("{}", v),
         };
         write!(f, "{}", s)
     }
@@ -59,6 +61,26 @@ impl Display for Function {
 }
 
 #[derive(Debug, Clone)]
+pub struct If {
+    pub condition: Box<Expr>,
+    pub then_branch: Box<Stmt>,
+    pub else_branch: Option<Box<Stmt>>,
+}
+
+impl Display for If {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match &self.else_branch {
+            Some(else_branch) => format!(
+                "if ({}) {} else {}",
+                self.condition, self.then_branch, else_branch
+            ),
+            None => format!("if ({}) {}", self.condition, self.then_branch),
+        };
+        write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct VarDecl {
     pub name: String,
     pub initializer: Option<Expr>,
@@ -80,6 +102,7 @@ pub enum Expr {
     Call(Call),
     Grouping(Grouping),
     Literal(Literal),
+    Logical(Logical),
     Unary(Unary),
     Variable(Variable),
     Assign(Assign),
@@ -92,6 +115,7 @@ impl Display for Expr {
             Expr::Call(c) => format!("{}", c),
             Expr::Grouping(g) => format!("{}", g),
             Expr::Literal(l) => format!("{}", l),
+            Expr::Logical(l) => format!("{}", l),
             Expr::Unary(u) => format!("{}", u),
             Expr::Variable(v) => format!("{}", v),
             Expr::Assign(a) => format!("{}", a),
@@ -162,6 +186,19 @@ impl Display for Literal {
             Literal::Nil => format!("nil"),
         };
         write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Logical {
+    pub left: Box<Expr>,
+    pub op: LogicalOp,
+    pub right: Box<Expr>,
+}
+
+impl Display for Logical {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} {} {})", self.left, self.op, self.right)
     }
 }
 
@@ -247,6 +284,32 @@ impl From<TokenType> for BinaryOp {
             TokenType::GreaterEqual => BinaryOp::GtEq,
             _ => panic!("Invalid token for binary op"),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum LogicalOp {
+    And,
+    Or,
+}
+
+impl From<TokenType> for LogicalOp {
+    fn from(ty: TokenType) -> Self {
+        match ty {
+            TokenType::And => LogicalOp::And,
+            TokenType::Or => LogicalOp::Or,
+            _ => panic!("Invalid token for logical op"),
+        }
+    }
+}
+
+impl Display for LogicalOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            LogicalOp::And => "and",
+            LogicalOp::Or => "or",
+        };
+        write!(f, "{}", s)
     }
 }
 

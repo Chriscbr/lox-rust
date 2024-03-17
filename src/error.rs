@@ -11,6 +11,8 @@ pub enum Error {
     ExpectedVariableName { token: Token },
     InvalidAssignmentTarget { token: Token },
     ExpectedRightBraceAfterBlock { token: Token },
+    ExpectedLeftParenAfterIf { token: Token },
+    ExpectedRightParenAfterIfCondition { token: Token },
     TooManyArguments { token: Token },
     ExpectedRightParenAfterArguments { token: Token },
     ExpectedFunctionName { token: Token },
@@ -80,6 +82,26 @@ pub fn report_errors(errors: &[Error]) {
                 ),
                 _ => println!(
                     "[line {}] Error at '{}': Expected '}}' after block.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedLeftParenAfterIf { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected '(' after 'if'.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected '(' after 'if'.",
+                    token.line, token.lexeme
+                ),
+            },
+            Error::ExpectedRightParenAfterIfCondition { token } => match token.ty {
+                TokenType::EOF => println!(
+                    "[line {}] Error at end: Expected ')' after if condition.",
+                    token.line
+                ),
+                _ => println!(
+                    "[line {}] Error at '{}': Expected ')' after if condition.",
                     token.line, token.lexeme
                 ),
             },

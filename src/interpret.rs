@@ -4,8 +4,8 @@ mod value;
 use std::sync::Arc;
 
 use crate::ast::{
-    Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, Literal, Stmt, Unary, UnaryOp,
-    VarDecl, Variable,
+    Assign, Binary, BinaryOp, Call, Expr, Function, Grouping, If, Literal, Logical, LogicalOp,
+    Stmt, Unary, UnaryOp, VarDecl, Variable,
 };
 
 use self::{
@@ -44,9 +44,10 @@ impl Interpreter {
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
-            Stmt::Function(func) => self.execute_function_decl(func),
-            Stmt::Print(expr) => self.execute_print(expr),
             Stmt::Expr(expr) => self.execute_expr(expr),
+            Stmt::Function(func) => self.execute_function_decl(func),
+            Stmt::If(i) => self.execute_if(i),
+            Stmt::Print(expr) => self.execute_print(expr),
             Stmt::VarDecl(var_decl) => self.execute_var_decl(var_decl),
             Stmt::Block(stmts) => {
                 let env = Environment::new_enclosing(&self.env);
@@ -69,6 +70,16 @@ impl Interpreter {
 
     fn execute_expr(&mut self, expr: &Expr) -> Result<(), RuntimeError> {
         self.expr(expr)?;
+        Ok(())
+    }
+
+    fn execute_if(&mut self, i: &If) -> Result<(), RuntimeError> {
+        let cond = self.expr(&i.condition)?;
+        if self.is_truthy(&cond) {
+            self.execute(&i.then_branch)?;
+        } else if let Some(else_branch) = &i.else_branch {
+            self.execute(else_branch)?;
+        }
         Ok(())
     }
 
@@ -96,6 +107,7 @@ impl Interpreter {
             Expr::Call(c) => self.call(c),
             Expr::Grouping(g) => self.grouping(g),
             Expr::Literal(l) => self.literal(l),
+            Expr::Logical(l) => self.logical(l),
             Expr::Unary(u) => self.unary(u),
             Expr::Variable(v) => self.variable(v),
             Expr::Assign(a) => self.assign(a),
@@ -201,6 +213,25 @@ impl Interpreter {
             Literal::Bool(b) => Ok(RuntimeValue::Bool(*b)),
             Literal::Nil => Ok(RuntimeValue::Nil),
         }
+    }
+
+    fn logical(&mut self, logical: &Logical) -> Result<RuntimeValue, RuntimeError> {
+        let left = self.expr(&logical.left)?;
+
+        match logical.op {
+            LogicalOp::And => {
+                if !self.is_truthy(&left) {
+                    return Ok(left);
+                }
+            }
+            LogicalOp::Or => {
+                if self.is_truthy(&left) {
+                    return Ok(left);
+                }
+            }
+        }
+
+        self.expr(&logical.right)
     }
 
     fn unary(&mut self, unary: &Unary) -> Result<RuntimeValue, RuntimeError> {
