@@ -1,2 +1,2 @@
 var t = clock();
-print t;
+print t > 1700000000;

@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.3", features = ["derive"] }
+insta = "1.36.1"
 phf = { version = "0.11.2", features = ["macros"] }

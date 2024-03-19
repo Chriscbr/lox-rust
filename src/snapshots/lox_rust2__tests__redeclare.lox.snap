@@ -1,0 +1,7 @@
+---
+source: src/main.rs
+expression: contents
+---
+stdout:
+
+stderr:

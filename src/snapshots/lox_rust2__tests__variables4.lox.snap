@@ -1,0 +1,8 @@
+---
+source: src/main.rs
+expression: contents
+---
+stdout:
+
+stderr:
+[line 1] Error at '=': Invalid assignment target

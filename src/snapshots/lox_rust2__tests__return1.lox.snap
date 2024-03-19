@@ -1,0 +1,9 @@
+---
+source: src/main.rs
+expression: contents
+---
+stdout:
+don't return anything
+nil
+
+stderr:

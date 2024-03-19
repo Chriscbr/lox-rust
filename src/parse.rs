@@ -1,4 +1,4 @@
-use std::{fmt::Display, rc::Rc};
+use std::{fmt::Display, io::Write, rc::Rc};
 
 use crate::{
     ast::{
@@ -576,7 +576,8 @@ impl Parser {
             }));
         }
 
-        todo!("Expected expression");
+        self.advance(); // TODO: remove?
+        Err((ParseError::ExpectedExpression, self.peek().clone()))
     }
 
     fn matches(&mut self, tys: &[TokenType]) -> bool {
@@ -655,6 +656,7 @@ enum FunctionKind {
 }
 
 pub enum ParseError {
+    ExpectedExpression,
     ExpectedRightParenAfterExpr,
     ExpectedSemicolonAfterExpression,
     ExpectedVariableName,
@@ -688,6 +690,7 @@ pub enum ParseError {
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
+            ParseError::ExpectedExpression => "Expected expression".to_string(),
             ParseError::ExpectedRightParenAfterExpr => "Expected ')' after expression".to_string(),
             ParseError::ExpectedSemicolonAfterExpression => {
                 "Expected ';' after expression".to_string()
@@ -741,17 +744,24 @@ impl Display for ParseError {
     }
 }
 
-pub fn report_parse_errors(errors: Vec<(ParseError, Token)>) {
+pub fn report_parse_errors<W: Write>(errors: Vec<(ParseError, Token)>, stderr: &mut W) {
     for (error, token) in errors {
         match token.ty {
             TokenType::EOF => {
-                println!("[line {}] Error at end of file: {}", token.line, error);
+                writeln!(
+                    stderr,
+                    "[line {}] Error at end of file: {}",
+                    token.line, error
+                )
+                .unwrap();
             }
             _ => {
-                println!(
+                writeln!(
+                    stderr,
                     "[line {}] Error at '{}': {}",
                     token.line, token.lexeme, error
-                );
+                )
+                .unwrap();
             }
         }
     }

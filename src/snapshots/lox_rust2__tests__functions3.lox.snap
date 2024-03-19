@@ -1,0 +1,8 @@
+---
+source: src/main.rs
+expression: contents
+---
+stdout:
+Hi, Dear Reader!
+
+stderr:

@@ -1,0 +1,9 @@
+---
+source: src/main.rs
+expression: contents
+---
+stdout:
+
+stderr:
+[line 7] Error at '<': Expected '{' after class name
+[line 12] Error at '}': Expected expression

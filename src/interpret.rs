@@ -1,7 +1,7 @@
 mod env;
 mod value;
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc};
 
 use crate::ast::{
     Assign, Binary, BinaryOp, Call, Class, Expr, Function, Get, Grouping, If, Literal, Logical,
@@ -10,13 +10,14 @@ use crate::ast::{
 
 use self::{env::Environment, value::RuntimeValue};
 
-pub struct Interpreter {
+pub struct Interpreter<'a> {
+    stdout: Box<dyn Write + 'a>,
     env: Rc<RefCell<Environment>>,
     inside_function: bool,
 }
 
-impl Interpreter {
-    pub fn new() -> Self {
+impl<'a> Interpreter<'a> {
+    pub fn new(stdout: Box<dyn Write + 'a>) -> Self {
         let globals = Rc::new(RefCell::new(Environment::new(None)));
         globals.borrow_mut().set_global(
             "clock",
@@ -31,6 +32,7 @@ impl Interpreter {
         );
 
         Self {
+            stdout,
             env: globals.clone(),
             inside_function: false,
         }
@@ -140,7 +142,7 @@ impl Interpreter {
 
     fn execute_print(&mut self, p: &Print) -> Result<(), RuntimeError> {
         let value = self.expr(&p.expr)?;
-        println!("{}", value);
+        writeln!(self.stdout, "{}", value).unwrap();
         Ok(())
     }
 

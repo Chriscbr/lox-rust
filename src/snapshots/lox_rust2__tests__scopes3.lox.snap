@@ -1,0 +1,8 @@
+---
+source: src/main.rs
+expression: contents
+---
+stdout:
+
+stderr:
+Already a variable with the name 'a' in this scope.
