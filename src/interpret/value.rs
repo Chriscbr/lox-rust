@@ -68,18 +68,16 @@ impl Function {
         }
     }
 
-    pub fn bind(&self, instance: Instance) -> Function {
-        let env = Rc::new(RefCell::new(Environment::new(Some(self.closure.clone()))));
+    pub fn bind(&self, instance: Instance) -> Result<Function, RuntimeError> {
+        let env = Environment::new(Some(self.closure.clone()));
         let env = Rc::new(RefCell::new(
-            env.borrow()
-                .extend("this", RuntimeValue::Instance(instance))
-                .unwrap(),
+            env.extend("this", RuntimeValue::Instance(instance))?,
         ));
-        Function {
+        Ok(Function {
             arity: self.arity,
             fun: self.fun.clone(),
             closure: env,
-        }
+        })
     }
 }
 
@@ -137,7 +135,7 @@ impl Instance {
         if let Some(method) = self.class.find_method(name) {
             match method {
                 RuntimeValue::Function(method) => {
-                    return Ok(RuntimeValue::Function(method.bind(self.clone())));
+                    return Ok(RuntimeValue::Function(method.bind(self.clone())?));
                 }
                 _ => panic!("Expected method to be a function"),
             }

@@ -168,6 +168,7 @@ pub enum Expr {
     Literal(Literal),
     Logical(Logical),
     Set(Set),
+    This(This),
     Unary(Unary),
     Variable(Variable),
 }
@@ -183,6 +184,7 @@ impl Display for Expr {
             Expr::Literal(l) => format!("{}", l),
             Expr::Logical(l) => format!("{}", l),
             Expr::Set(s) => format!("{}", s),
+            Expr::This(t) => format!("{}", t),
             Expr::Unary(u) => format!("{}", u),
             Expr::Variable(v) => format!("{}", v),
         };
@@ -302,6 +304,15 @@ pub struct Set {
 impl Display for Set {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}.{} = {}", self.object, self.name, self.value)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct This;
+
+impl Display for This {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "this")
     }
 }
 

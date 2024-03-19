@@ -3,7 +3,7 @@ use std::{fmt::Display, io::Write, rc::Rc};
 use crate::{
     ast::{
         Assign, Binary, BinaryOp, Call, Class, Expr, Function, Get, Grouping, If, Literal, Logical,
-        LogicalOp, Print, Return, Set, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
+        LogicalOp, Print, Return, Set, Stmt, This, Unary, UnaryOp, VarDecl, Variable, While,
     },
     token::{Token, TokenType},
 };
@@ -557,6 +557,10 @@ impl Parser {
             // Trim the surrounding quotes.
             let trimmed = &s[1..s.len() - 1];
             return Ok(Expr::Literal(Literal::String(trimmed.to_string())));
+        }
+
+        if self.matches(&[TokenType::This]) {
+            return Ok(Expr::This(This));
         }
 
         if self.matches(&[TokenType::Identifier]) {

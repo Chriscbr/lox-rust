@@ -5,9 +5,6 @@ expression: contents
 stdout:
 
 stderr:
-[line 26] Error at '.': Expected expression
-[line 27] Error at '.': Expected expression
 [line 44] Error at '<': Expected '{' after class name
-[line 47] Error at '.': Expected expression
 [line 50] Error at 'drink': Expected expression
 [line 53] Error at '}': Expected expression

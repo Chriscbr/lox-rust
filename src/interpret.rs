@@ -5,7 +5,7 @@ use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc};
 
 use crate::ast::{
     Assign, Binary, BinaryOp, Call, Class, Expr, Function, Get, Grouping, If, Literal, Logical,
-    LogicalOp, Print, Return, Set, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
+    LogicalOp, Print, Return, Set, Stmt, This, Unary, UnaryOp, VarDecl, Variable, While,
 };
 
 use self::{env::Environment, value::RuntimeValue};
@@ -87,6 +87,9 @@ impl<'a> Interpreter<'a> {
     }
 
     fn execute_class(&mut self, class: &Class) -> Result<(), RuntimeError> {
+        // let new_env = self.env.borrow().extend(&class.name, RuntimeValue::Nil)?;
+        // self.env = Rc::new(RefCell::new(new_env));
+
         let mut methods = HashMap::new();
         for method in &class.methods {
             let value = RuntimeValue::Function(value::Function::new(
@@ -96,6 +99,7 @@ impl<'a> Interpreter<'a> {
             ));
             methods.insert(method.name.clone(), value);
         }
+
         let class_value = RuntimeValue::Class(value::Class::new(class.name.clone(), methods));
         let new_env = self.env.borrow().extend(&class.name, class_value)?;
         self.env = Rc::new(RefCell::new(new_env));
@@ -190,6 +194,7 @@ impl<'a> Interpreter<'a> {
             Expr::Literal(l) => self.literal(l),
             Expr::Logical(l) => self.logical(l),
             Expr::Set(s) => self.set(s),
+            Expr::This(t) => self.this(t),
             Expr::Unary(u) => self.unary(u),
             Expr::Variable(v) => self.variable(v),
         }
@@ -334,6 +339,14 @@ impl<'a> Interpreter<'a> {
         }
     }
 
+    fn this(&self, _this: &This) -> Result<RuntimeValue, RuntimeError> {
+        match self.env.borrow().get("this") {
+            Ok(v) => Ok(v),
+            Err(RuntimeError::UndefinedVariable(_)) => Err(RuntimeError::CantUseThisOutsideClass),
+            Err(e) => Err(e),
+        }
+    }
+
     fn unary(&mut self, unary: &Unary) -> Result<RuntimeValue, RuntimeError> {
         let right = self.expr(&unary.right)?;
 
@@ -381,6 +394,8 @@ pub enum RuntimeError {
     CannotReturnFromTopLevel,
     UndefinedProperty(String),
     OnlyInstancesHaveFields,
+    CantUseThisOutsideClass,
+    // Special runtime error for returning values from a function
     ReturnValue(RuntimeValue),
 }
 
@@ -410,6 +425,9 @@ impl std::fmt::Display for RuntimeError {
             }
             RuntimeError::OnlyInstancesHaveFields => {
                 write!(f, "Only instances have fields.")
+            }
+            RuntimeError::CantUseThisOutsideClass => {
+                write!(f, "Can't use 'this' outside of a class.")
             }
             RuntimeError::ReturnValue(_) => panic!("Internal error: unhandled return value"),
         }

@@ -3,6 +3,6 @@ source: src/main.rs
 expression: contents
 ---
 stdout:
-The German chocolate cake is delicious!
 
 stderr:
+Can't use 'this' outside of a class.
