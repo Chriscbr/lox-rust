@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::{fmt::Display, rc::Rc};
 
 use crate::token::TokenType;
 
@@ -7,7 +7,7 @@ pub enum Stmt {
     Block(Vec<Stmt>),
     Class(Class),
     Expr(Expr),
-    Function(Arc<Function>),
+    Function(Rc<Function>),
     If(If),
     Print(Print),
     Return(Return),
@@ -43,7 +43,7 @@ impl Display for Stmt {
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: String,
-    pub methods: Vec<Arc<Function>>,
+    pub methods: Vec<Rc<Function>>,
 }
 
 impl Display for Class {

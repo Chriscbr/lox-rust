@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::{fmt::Display, rc::Rc};
 
 use crate::{
     ast::{
@@ -318,7 +318,7 @@ impl Parser {
 
         let body = self.parse_block()?;
 
-        Ok(Stmt::Function(Arc::new(Function { name, params, body })))
+        Ok(Stmt::Function(Rc::new(Function { name, params, body })))
     }
 
     fn parse_block(&mut self) -> Result<Vec<Stmt>, (ParseError, Token)> {

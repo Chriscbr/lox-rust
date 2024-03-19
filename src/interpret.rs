@@ -1,7 +1,7 @@
 mod env;
 mod value;
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::ast::{
     Assign, Binary, BinaryOp, Call, Class, Expr, Function, Get, Grouping, If, Literal, Logical,
@@ -20,7 +20,7 @@ impl Interpreter {
         let globals = Rc::new(RefCell::new(Environment::new(None)));
         globals.borrow_mut().set_global(
             "clock",
-            RuntimeValue::NativeFunction(Arc::new(|_| {
+            RuntimeValue::NativeFunction(Rc::new(|_| {
                 Ok(RuntimeValue::Number(
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
@@ -105,7 +105,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn execute_function_decl(&mut self, fun: &Arc<Function>) -> Result<(), RuntimeError> {
+    fn execute_function_decl(&mut self, fun: &Rc<Function>) -> Result<(), RuntimeError> {
         let func = RuntimeValue::Function(value::Function::new(
             fun.params.len(),
             fun.clone(),

@@ -11,7 +11,7 @@ pub enum RuntimeValue {
     Number(f64),
     String(String),
     Function(Function),
-    NativeFunction(Arc<fn(&[RuntimeValue]) -> Result<RuntimeValue, RuntimeError>>),
+    NativeFunction(Rc<fn(&[RuntimeValue]) -> Result<RuntimeValue, RuntimeError>>),
     Class(Class),
     Instance(Instance),
 }
@@ -19,7 +19,7 @@ pub enum RuntimeValue {
 #[derive(Clone)]
 pub struct Function {
     pub arity: usize,
-    pub fun: Arc<ast::Function>,
+    pub fun: Rc<ast::Function>,
     pub closure: Rc<RefCell<Environment>>,
 }
 
@@ -33,7 +33,7 @@ impl Debug for Function {
 }
 
 impl Function {
-    pub fn new(arity: usize, fun: Arc<ast::Function>, closure: Rc<RefCell<Environment>>) -> Self {
+    pub fn new(arity: usize, fun: Rc<ast::Function>, closure: Rc<RefCell<Environment>>) -> Self {
         Self {
             arity,
             fun,
