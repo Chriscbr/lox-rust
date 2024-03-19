@@ -12,8 +12,8 @@ pub enum RuntimeValue {
     String(String),
     Function(Function),
     NativeFunction(Arc<fn(&[RuntimeValue]) -> Result<RuntimeValue, RuntimeError>>),
-    Class(Class),       // TODO: Rc<RefCell<Class>>?
-    Instance(Instance), // TODO: Rc<RefCell<Instance>>?
+    Class(Class),
+    Instance(Instance),
 }
 
 #[derive(Clone)]
@@ -117,19 +117,20 @@ impl Class {
 #[derive(Debug, Clone)]
 pub struct Instance {
     pub class: Arc<Class>,
-    pub fields: HashMap<String, Rc<RefCell<RuntimeValue>>>,
+    // fields are stored in a Rc/RefCell so that cloning an instance results in a shallow copy
+    pub fields: Rc<RefCell<HashMap<String, Rc<RefCell<RuntimeValue>>>>>,
 }
 
 impl Instance {
     pub fn new(class: Arc<Class>) -> Self {
         Self {
             class,
-            fields: HashMap::new(),
+            fields: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
     pub fn get(&self, name: &str) -> Result<RuntimeValue, RuntimeError> {
-        if let Some(value) = self.fields.get(name) {
+        if let Some(value) = self.fields.borrow().get(name) {
             return Ok(value.borrow().clone());
         }
 
@@ -146,12 +147,13 @@ impl Instance {
     }
 
     pub fn set(&mut self, name: &str, value: RuntimeValue) {
-        if let Some(field) = self.fields.get(name) {
+        if let Some(field) = self.fields.borrow().get(name) {
             field.replace(value);
-        } else {
-            self.fields
-                .insert(name.to_string(), Rc::new(RefCell::new(value)));
+            return;
         }
+        self.fields
+            .borrow_mut()
+            .insert(name.to_string(), Rc::new(RefCell::new(value)));
     }
 }
 

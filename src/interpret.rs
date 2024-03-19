@@ -58,7 +58,6 @@ impl Interpreter {
             Stmt::VarDecl(var_decl) => self.execute_var_decl(var_decl),
             Stmt::While(w) => self.execute_while(w),
         }?;
-        dbg!(&self.env);
         Ok(())
     }
 
@@ -327,7 +326,6 @@ impl Interpreter {
         match object {
             RuntimeValue::Instance(mut i) => {
                 i.set(&set.name, value.clone());
-                dbg!(&i);
                 Ok(value)
             }
             _ => Err(RuntimeError::OnlyInstancesHaveFields),
