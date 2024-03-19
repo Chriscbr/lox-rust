@@ -1,0 +1,8 @@
+---
+source: src/main.rs
+expression: contents
+---
+stdout:
+Enjoy your bacon and toast, Dear Reader.
+
+stderr:

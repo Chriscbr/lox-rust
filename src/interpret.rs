@@ -21,7 +21,7 @@ impl<'a> Interpreter<'a> {
         let globals = Rc::new(RefCell::new(Environment::new(None)));
         globals.borrow_mut().set_global(
             "clock",
-            RuntimeValue::NativeFunction(Rc::new(|_| {
+            RuntimeValue::NativeFunction(value::NativeFunction::new(0, |_, _| {
                 Ok(RuntimeValue::Number(
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
@@ -96,6 +96,7 @@ impl<'a> Interpreter<'a> {
                 method.params.len(),
                 method.clone(),
                 self.env.clone(),
+                method.name == "init",
             ));
             methods.insert(method.name.clone(), value);
         }
@@ -116,6 +117,7 @@ impl<'a> Interpreter<'a> {
             fun.params.len(),
             fun.clone(),
             self.env.clone(),
+            false,
         ));
         if self.env.borrow().is_global() {
             self.env.borrow_mut().set_global(&fun.name, func);
@@ -281,7 +283,7 @@ impl<'a> Interpreter<'a> {
 
         match callee {
             RuntimeValue::Function(f) => f.call(self, args),
-            RuntimeValue::NativeFunction(f) => f(&args),
+            RuntimeValue::NativeFunction(f) => f.call(self, args),
             RuntimeValue::Class(c) => c.call(self, args),
             _ => Err(RuntimeError::NotCallable),
         }
@@ -395,6 +397,7 @@ pub enum RuntimeError {
     UndefinedProperty(String),
     OnlyInstancesHaveFields,
     CantUseThisOutsideClass,
+    CannotReturnInsideInit,
     // Special runtime error for returning values from a function
     ReturnValue(RuntimeValue),
 }
@@ -428,6 +431,9 @@ impl std::fmt::Display for RuntimeError {
             }
             RuntimeError::CantUseThisOutsideClass => {
                 write!(f, "Can't use 'this' outside of a class.")
+            }
+            RuntimeError::CannotReturnInsideInit => {
+                write!(f, "Cannot return a value from an initializer.")
             }
             RuntimeError::ReturnValue(_) => panic!("Internal error: unhandled return value"),
         }

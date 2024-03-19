@@ -11,9 +11,38 @@ pub enum RuntimeValue {
     Number(f64),
     String(String),
     Function(Function),
-    NativeFunction(Rc<fn(&[RuntimeValue]) -> Result<RuntimeValue, RuntimeError>>),
+    NativeFunction(NativeFunction),
     Class(Class),
     Instance(Instance),
+}
+
+#[derive(Debug, Clone)]
+pub struct NativeFunction {
+    pub arity: usize,
+    pub fun: Rc<fn(&mut Interpreter, Vec<RuntimeValue>) -> Result<RuntimeValue, RuntimeError>>,
+}
+
+impl NativeFunction {
+    pub fn new(
+        arity: usize,
+        fun: fn(&mut Interpreter, Vec<RuntimeValue>) -> Result<RuntimeValue, RuntimeError>,
+    ) -> Self {
+        Self {
+            arity,
+            fun: Rc::new(fun),
+        }
+    }
+
+    pub fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<RuntimeValue>,
+    ) -> Result<RuntimeValue, RuntimeError> {
+        if args.len() != self.arity {
+            return Err(RuntimeError::InvalidArgumentCount);
+        }
+        (self.fun)(interpreter, args)
+    }
 }
 
 #[derive(Clone)]
@@ -21,6 +50,7 @@ pub struct Function {
     pub arity: usize,
     pub fun: Rc<ast::Function>,
     pub closure: Rc<RefCell<Environment>>,
+    pub is_init: bool,
 }
 
 impl Debug for Function {
@@ -33,11 +63,17 @@ impl Debug for Function {
 }
 
 impl Function {
-    pub fn new(arity: usize, fun: Rc<ast::Function>, closure: Rc<RefCell<Environment>>) -> Self {
+    pub fn new(
+        arity: usize,
+        fun: Rc<ast::Function>,
+        closure: Rc<RefCell<Environment>>,
+        is_init: bool,
+    ) -> Self {
         Self {
             arity,
             fun,
             closure,
+            is_init,
         }
     }
 
@@ -58,13 +94,23 @@ impl Function {
 
         let prev_inside_function = interpreter.inside_function;
         interpreter.inside_function = true;
+
         let result = interpreter.execute_block(&self.fun.body, env);
+
         interpreter.inside_function = prev_inside_function;
 
-        match result {
-            Ok(_) => Ok(RuntimeValue::Nil),
-            Err(RuntimeError::ReturnValue(value)) => Ok(value),
-            Err(e) => Err(e),
+        if self.is_init {
+            match result {
+                Ok(_) => Ok(self.closure.borrow().get("this")?),
+                Err(RuntimeError::ReturnValue(_)) => Err(RuntimeError::CannotReturnInsideInit),
+                Err(e) => Err(e),
+            }
+        } else {
+            match result {
+                Ok(_) => Ok(RuntimeValue::Nil),
+                Err(RuntimeError::ReturnValue(value)) => Ok(value),
+                Err(e) => Err(e),
+            }
         }
     }
 
@@ -77,6 +123,7 @@ impl Function {
             arity: self.arity,
             fun: self.fun.clone(),
             closure: env,
+            is_init: self.is_init,
         })
     }
 }
@@ -97,11 +144,16 @@ impl Class {
         interpreter: &mut Interpreter,
         args: Vec<RuntimeValue>,
     ) -> Result<RuntimeValue, RuntimeError> {
+        if args.len() != self.arity() {
+            return Err(RuntimeError::InvalidArgumentCount);
+        }
+
         let instance = Instance::new(Arc::new(self.clone()));
         let init = self.methods.get("init");
         if let Some(init) = init {
             if let RuntimeValue::Function(init) = init {
-                init.call(interpreter, args)?;
+                let binded_fn = init.bind(instance.clone())?;
+                binded_fn.call(interpreter, args)?;
             }
         }
         Ok(RuntimeValue::Instance(instance))
@@ -110,12 +162,21 @@ impl Class {
     pub fn find_method(&self, name: &str) -> Option<RuntimeValue> {
         self.methods.get(name).cloned()
     }
+
+    pub fn arity(&self) -> usize {
+        if let Some(RuntimeValue::Function(init)) = self.methods.get("init") {
+            init.arity
+        } else {
+            0
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Instance {
     pub class: Arc<Class>,
-    // fields are stored in a Rc/RefCell so that cloning an instance results in a shallow copy
+    // hashmap is stored in a Rc/RefCell so that cloning an instance results in a shallow copy
+    // if there's a use case for a deep copy, consider adding a separate method for that
     pub fields: Rc<RefCell<HashMap<String, Rc<RefCell<RuntimeValue>>>>>,
 }
 

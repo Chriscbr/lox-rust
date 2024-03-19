@@ -1,0 +1,8 @@
+---
+source: src/main.rs
+expression: contents
+---
+stdout:
+
+stderr:
+Cannot return a value from an initializer.

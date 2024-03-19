@@ -1,0 +1,10 @@
+---
+source: src/main.rs
+expression: contents
+---
+stdout:
+Foo instance
+Foo instance
+Foo instance
+
+stderr:
