@@ -2,8 +2,8 @@ use std::{fmt::Display, sync::Arc};
 
 use crate::{
     ast::{
-        Assign, Binary, BinaryOp, Call, Class, Expr, Function, Grouping, If, Literal, Logical,
-        LogicalOp, Print, Return, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
+        Assign, Binary, BinaryOp, Call, Class, Expr, Function, Get, Grouping, If, Literal, Logical,
+        LogicalOp, Print, Return, Set, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
     },
     token::{Token, TokenType},
 };
@@ -353,6 +353,12 @@ impl Parser {
                     name: v.name,
                     value: Box::new(value),
                 }));
+            } else if let Expr::Get(g) = expr {
+                return Ok(Expr::Set(Set {
+                    object: g.object,
+                    name: g.name,
+                    value: Box::new(value),
+                }));
             }
 
             return Err((ParseError::InvalidAssignmentTarget, equals.clone()));
@@ -508,6 +514,18 @@ impl Parser {
         loop {
             if self.matches(&[TokenType::LeftParen]) {
                 expr = self.finish_call(expr)?;
+            } else if self.matches(&[TokenType::Dot]) {
+                let name = self
+                    .consume(
+                        TokenType::Identifier,
+                        ParseError::ExpectedPropertyNameAfterDot,
+                    )?
+                    .lexeme
+                    .clone();
+                expr = Expr::Get(Get {
+                    object: Box::new(expr),
+                    name,
+                });
             } else {
                 break;
             }
@@ -664,6 +682,7 @@ pub enum ParseError {
     ExpectedClassName,
     ExpectedLeftBraceAfterClassName,
     ExpectedRightBraceAfterClass,
+    ExpectedPropertyNameAfterDot,
 }
 
 impl Display for ParseError {
@@ -714,6 +733,9 @@ impl Display for ParseError {
                 "Expected '{' after class name".to_string()
             }
             ParseError::ExpectedRightBraceAfterClass => "Expected '}' after class".to_string(),
+            ParseError::ExpectedPropertyNameAfterDot => {
+                "Expected property name after '.'".to_string()
+            }
         };
         write!(f, "{}", s)
     }

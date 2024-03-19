@@ -160,29 +160,45 @@ impl Display for While {
 
 #[derive(Debug, Clone)]
 pub enum Expr {
+    Assign(Assign),
     Binary(Binary),
     Call(Call),
+    Get(Get),
     Grouping(Grouping),
     Literal(Literal),
     Logical(Logical),
+    Set(Set),
     Unary(Unary),
     Variable(Variable),
-    Assign(Assign),
 }
 
 impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
+            Expr::Assign(a) => format!("{}", a),
             Expr::Binary(b) => format!("{}", b),
             Expr::Call(c) => format!("{}", c),
+            Expr::Get(g) => format!("{}", g),
             Expr::Grouping(g) => format!("{}", g),
             Expr::Literal(l) => format!("{}", l),
             Expr::Logical(l) => format!("{}", l),
+            Expr::Set(s) => format!("{}", s),
             Expr::Unary(u) => format!("{}", u),
             Expr::Variable(v) => format!("{}", v),
-            Expr::Assign(a) => format!("{}", a),
         };
         write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Assign {
+    pub name: String,
+    pub value: Box<Expr>,
+}
+
+impl Display for Assign {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} = {}", self.name, self.value)
     }
 }
 
@@ -217,6 +233,18 @@ impl Display for Call {
         }
         s.push_str(")");
         write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Get {
+    pub object: Box<Expr>,
+    pub name: String,
+}
+
+impl Display for Get {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}", self.object, self.name)
     }
 }
 
@@ -265,6 +293,19 @@ impl Display for Logical {
 }
 
 #[derive(Debug, Clone)]
+pub struct Set {
+    pub object: Box<Expr>,
+    pub name: String,
+    pub value: Box<Expr>,
+}
+
+impl Display for Set {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{} = {}", self.object, self.name, self.value)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Unary {
     pub op: UnaryOp,
     pub right: Box<Expr>,
@@ -284,18 +325,6 @@ pub struct Variable {
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Assign {
-    pub name: String,
-    pub value: Box<Expr>,
-}
-
-impl Display for Assign {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} = {}", self.name, self.value)
     }
 }
 

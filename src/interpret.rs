@@ -4,8 +4,8 @@ mod value;
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use crate::ast::{
-    Assign, Binary, BinaryOp, Call, Class, Expr, Function, Grouping, If, Literal, Logical,
-    LogicalOp, Print, Return, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
+    Assign, Binary, BinaryOp, Call, Class, Expr, Function, Get, Grouping, If, Literal, Logical,
+    LogicalOp, Print, Return, Set, Stmt, Unary, UnaryOp, VarDecl, Variable, While,
 };
 
 use self::{env::Environment, value::RuntimeValue};
@@ -57,7 +57,9 @@ impl Interpreter {
             Stmt::Return(r) => self.execute_return(r),
             Stmt::VarDecl(var_decl) => self.execute_var_decl(var_decl),
             Stmt::While(w) => self.execute_while(w),
-        }
+        }?;
+        dbg!(&self.env);
+        Ok(())
     }
 
     fn execute_block(
@@ -179,15 +181,31 @@ impl Interpreter {
 
     fn expr(&mut self, expr: &Expr) -> Result<RuntimeValue, RuntimeError> {
         match expr {
+            Expr::Assign(a) => self.assign(a),
             Expr::Binary(b) => self.binary(b),
             Expr::Call(c) => self.call(c),
+            Expr::Get(g) => self.get(g),
             Expr::Grouping(g) => self.grouping(g),
             Expr::Literal(l) => self.literal(l),
             Expr::Logical(l) => self.logical(l),
+            Expr::Set(s) => self.set(s),
             Expr::Unary(u) => self.unary(u),
             Expr::Variable(v) => self.variable(v),
-            Expr::Assign(a) => self.assign(a),
         }
+    }
+
+    fn assign(&mut self, assign: &Assign) -> Result<RuntimeValue, RuntimeError> {
+        let value = self.expr(&assign.value)?;
+        self.assign_variable(&assign.name, value.clone())?;
+        Ok(value)
+    }
+
+    fn assign_variable(&mut self, name: &str, value: RuntimeValue) -> Result<(), RuntimeError> {
+        if self.env.borrow().is_global() {
+            self.env.borrow_mut().set_global(name, value);
+            return Ok(());
+        }
+        self.env.borrow().assign(name, value)
     }
 
     fn binary(&mut self, binary: &Binary) -> Result<RuntimeValue, RuntimeError> {
@@ -258,6 +276,15 @@ impl Interpreter {
         match callee {
             RuntimeValue::Function(f) => f.call(self, args),
             RuntimeValue::NativeFunction(f) => f(&args),
+            RuntimeValue::Class(c) => c.call(self, args),
+            _ => Err(RuntimeError::NotCallable),
+        }
+    }
+
+    fn get(&mut self, get: &Get) -> Result<RuntimeValue, RuntimeError> {
+        let object = self.expr(&get.object)?;
+        match object {
+            RuntimeValue::Instance(i) => i.get(&get.name),
             _ => Err(RuntimeError::NotCallable),
         }
     }
@@ -294,6 +321,19 @@ impl Interpreter {
         self.expr(&logical.right)
     }
 
+    fn set(&mut self, set: &Set) -> Result<RuntimeValue, RuntimeError> {
+        let object = self.expr(&set.object)?;
+        let value = self.expr(&set.value)?;
+        match object {
+            RuntimeValue::Instance(mut i) => {
+                i.set(&set.name, value.clone());
+                dbg!(&i);
+                Ok(value)
+            }
+            _ => Err(RuntimeError::OnlyInstancesHaveFields),
+        }
+    }
+
     fn unary(&mut self, unary: &Unary) -> Result<RuntimeValue, RuntimeError> {
         let right = self.expr(&unary.right)?;
 
@@ -308,20 +348,6 @@ impl Interpreter {
 
     fn variable(&self, variable: &Variable) -> Result<RuntimeValue, RuntimeError> {
         self.env.borrow().get(&variable.name)
-    }
-
-    fn assign(&mut self, assign: &Assign) -> Result<RuntimeValue, RuntimeError> {
-        let value = self.expr(&assign.value)?;
-        self.assign_variable(&assign.name, value.clone())?;
-        Ok(value)
-    }
-
-    fn assign_variable(&mut self, name: &str, value: RuntimeValue) -> Result<(), RuntimeError> {
-        if self.env.borrow().is_global() {
-            self.env.borrow_mut().set_global(name, value);
-            return Ok(());
-        }
-        self.env.borrow().assign(name, value)
     }
 
     fn is_truthy(&self, value: &RuntimeValue) -> bool {
@@ -353,6 +379,8 @@ pub enum RuntimeError {
     NotCallable,
     AlreadyDefined(String),
     CannotReturnFromTopLevel,
+    UndefinedProperty(String),
+    OnlyInstancesHaveFields,
     ReturnValue(RuntimeValue),
 }
 
@@ -376,6 +404,12 @@ impl std::fmt::Display for RuntimeError {
             }
             RuntimeError::CannotReturnFromTopLevel => {
                 write!(f, "Cannot return from top-level code.")
+            }
+            RuntimeError::UndefinedProperty(name) => {
+                write!(f, "Undefined property '{}'.", name)
+            }
+            RuntimeError::OnlyInstancesHaveFields => {
+                write!(f, "Only instances have fields.")
             }
             RuntimeError::ReturnValue(_) => panic!("Internal error: unhandled return value"),
         }

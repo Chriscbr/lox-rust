@@ -12,8 +12,8 @@ pub enum RuntimeValue {
     String(String),
     Function(Function),
     NativeFunction(Arc<fn(&[RuntimeValue]) -> Result<RuntimeValue, RuntimeError>>),
-    Class(Class),
-    Instance(Instance),
+    Class(Class),       // TODO: Rc<RefCell<Class>>?
+    Instance(Instance), // TODO: Rc<RefCell<Instance>>?
 }
 
 #[derive(Clone)]
@@ -67,6 +67,20 @@ impl Function {
             Err(e) => Err(e),
         }
     }
+
+    pub fn bind(&self, instance: Instance) -> Function {
+        let env = Rc::new(RefCell::new(Environment::new(Some(self.closure.clone()))));
+        let env = Rc::new(RefCell::new(
+            env.borrow()
+                .extend("this", RuntimeValue::Instance(instance))
+                .unwrap(),
+        ));
+        Function {
+            arity: self.arity,
+            fun: self.fun.clone(),
+            closure: env,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -79,12 +93,31 @@ impl Class {
     pub fn new(name: String, methods: HashMap<String, RuntimeValue>) -> Self {
         Self { name, methods }
     }
+
+    pub fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<RuntimeValue>,
+    ) -> Result<RuntimeValue, RuntimeError> {
+        let instance = Instance::new(Arc::new(self.clone()));
+        let init = self.methods.get("init");
+        if let Some(init) = init {
+            if let RuntimeValue::Function(init) = init {
+                init.call(interpreter, args)?;
+            }
+        }
+        Ok(RuntimeValue::Instance(instance))
+    }
+
+    pub fn find_method(&self, name: &str) -> Option<RuntimeValue> {
+        self.methods.get(name).cloned()
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Instance {
     pub class: Arc<Class>,
-    pub fields: HashMap<String, RuntimeValue>,
+    pub fields: HashMap<String, Rc<RefCell<RuntimeValue>>>,
 }
 
 impl Instance {
@@ -92,6 +125,32 @@ impl Instance {
         Self {
             class,
             fields: HashMap::new(),
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Result<RuntimeValue, RuntimeError> {
+        if let Some(value) = self.fields.get(name) {
+            return Ok(value.borrow().clone());
+        }
+
+        if let Some(method) = self.class.find_method(name) {
+            match method {
+                RuntimeValue::Function(method) => {
+                    return Ok(RuntimeValue::Function(method.bind(self.clone())));
+                }
+                _ => panic!("Expected method to be a function"),
+            }
+        }
+
+        Err(RuntimeError::UndefinedProperty(name.to_string()))
+    }
+
+    pub fn set(&mut self, name: &str, value: RuntimeValue) {
+        if let Some(field) = self.fields.get(name) {
+            field.replace(value);
+        } else {
+            self.fields
+                .insert(name.to_string(), Rc::new(RefCell::new(value)));
         }
     }
 }
@@ -113,7 +172,7 @@ impl Display for RuntimeValue {
             RuntimeValue::Function(c) => format!("<fn {}>", c.fun.name),
             RuntimeValue::NativeFunction(_) => format!("<native fn>"),
             RuntimeValue::Class(c) => format!("{}", c.name),
-            RuntimeValue::Instance(i) => format!("<instance of {}>", i.class.name),
+            RuntimeValue::Instance(i) => format!("{} instance", i.class.name),
         };
         write!(f, "{}", s)
     }
