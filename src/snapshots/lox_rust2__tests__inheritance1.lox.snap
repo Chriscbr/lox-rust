@@ -3,6 +3,6 @@ source: src/main.rs
 expression: contents
 ---
 stdout:
+Fry until golden brown.
 
 stderr:
-[line 7] Error at '<': Expected '{' after class name

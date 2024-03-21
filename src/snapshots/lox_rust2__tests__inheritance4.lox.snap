@@ -5,5 +5,4 @@ expression: contents
 stdout:
 
 stderr:
-[line 3] Error at '.': Expected expression
-[line 8] Error at '.': Expected expression
+Can't use 'super' outside of a class.

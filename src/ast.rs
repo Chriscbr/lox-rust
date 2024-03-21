@@ -43,15 +43,20 @@ impl Display for Stmt {
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: String,
-    pub methods: Vec<Rc<Function>>,
+    pub superclass: Option<Expr>,
+    pub methods: Vec<Stmt>,
 }
 
 impl Display for Class {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = String::new();
-        s.push_str(&format!("class {} {{\n", self.name));
+        let superclass = match &self.superclass {
+            Some(s) => format!(" < {}", s),
+            None => String::new(),
+        };
+        s.push_str(&format!("class {}{} {{\n", self.name, superclass));
         for method in &self.methods {
-            s.push_str(&format!("{}\n", method));
+            s.push_str(&format!("{}\n", method)[3..]); // remove "fun " from the beginning
         }
         s.push_str("}");
         write!(f, "{}", s)
@@ -86,7 +91,7 @@ impl Display for Function {
 
 #[derive(Debug, Clone)]
 pub struct If {
-    pub condition: Box<Expr>,
+    pub condition: Expr,
     pub then_branch: Box<Stmt>,
     pub else_branch: Option<Box<Stmt>>,
 }
@@ -106,7 +111,7 @@ impl Display for If {
 
 #[derive(Debug, Clone)]
 pub struct Print {
-    pub expr: Box<Expr>,
+    pub expr: Expr,
 }
 
 impl Display for Print {
@@ -148,7 +153,7 @@ impl Display for VarDecl {
 
 #[derive(Debug, Clone)]
 pub struct While {
-    pub condition: Box<Expr>,
+    pub condition: Expr,
     pub body: Box<Stmt>,
 }
 
@@ -168,6 +173,7 @@ pub enum Expr {
     Literal(Literal),
     Logical(Logical),
     Set(Set),
+    Super(Super),
     This(This),
     Unary(Unary),
     Variable(Variable),
@@ -184,6 +190,7 @@ impl Display for Expr {
             Expr::Literal(l) => format!("{}", l),
             Expr::Logical(l) => format!("{}", l),
             Expr::Set(s) => format!("{}", s),
+            Expr::Super(s) => format!("{}", s),
             Expr::This(t) => format!("{}", t),
             Expr::Unary(u) => format!("{}", u),
             Expr::Variable(v) => format!("{}", v),
@@ -304,6 +311,17 @@ pub struct Set {
 impl Display for Set {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}.{} = {}", self.object, self.name, self.value)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Super {
+    pub method: String,
+}
+
+impl Display for Super {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "super.{}", self.method)
     }
 }
 

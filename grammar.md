@@ -16,7 +16,8 @@ statement      → exprStmt
 block          → "{" declaration* "}" ;
 
 varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
-classDecl      → "class" IDENTIFIER "{" function* "}" ;
+classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )?
+                 "{" function* "}" ;
 
 ifStmt         → "if" "(" expression ")" statement
                ( "else" statement )? ;
@@ -37,10 +38,9 @@ term           → factor ( ( "-" | "+" ) factor )* ;
 factor         → unary ( ( "/" | "*" ) unary )* ;
 unary          → ( "!" | "-" ) unary | call ;
 call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
-primary        → "true" | "false" | "nil"
-               | NUMBER | STRING
-               | "(" expression ")"
-               | IDENTIFIER ;
+primary        → "true" | "false" | "nil" | "this"
+               | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+               | "super" "." IDENTIFIER ;
 
 arguments      → expression ( "," expression )* ;
 

@@ -5,7 +5,7 @@ use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc};
 
 use crate::ast::{
     Assign, Binary, BinaryOp, Call, Class, Expr, Function, Get, Grouping, If, Literal, Logical,
-    LogicalOp, Print, Return, Set, Stmt, This, Unary, UnaryOp, VarDecl, Variable, While,
+    LogicalOp, Print, Return, Set, Stmt, Super, This, Unary, UnaryOp, VarDecl, Variable, While,
 };
 
 use self::{env::Environment, value::RuntimeValue};
@@ -13,7 +13,7 @@ use self::{env::Environment, value::RuntimeValue};
 pub struct Interpreter<'a> {
     stdout: Box<dyn Write + 'a>,
     env: Rc<RefCell<Environment>>,
-    inside_function: bool,
+    curr_func: Option<value::Function>,
 }
 
 impl<'a> Interpreter<'a> {
@@ -34,7 +34,7 @@ impl<'a> Interpreter<'a> {
         Self {
             stdout,
             env: globals.clone(),
-            inside_function: false,
+            curr_func: None,
         }
     }
 
@@ -87,23 +87,55 @@ impl<'a> Interpreter<'a> {
     }
 
     fn execute_class(&mut self, class: &Class) -> Result<(), RuntimeError> {
-        // let new_env = self.env.borrow().extend(&class.name, RuntimeValue::Nil)?;
-        // self.env = Rc::new(RefCell::new(new_env));
+        let superclass = if let Some(superclass) = &class.superclass {
+            let superclass = self.expr(superclass)?;
+            match superclass {
+                RuntimeValue::Class(c) => Some(Box::new(c)),
+                _ => return Err(RuntimeError::SuperclassMustBeClass),
+            }
+        } else {
+            None
+        };
 
         let mut methods = HashMap::new();
         for method in &class.methods {
-            let value = RuntimeValue::Function(value::Function::new(
-                method.params.len(),
-                method.clone(),
-                self.env.clone(),
-                method.name == "init",
-            ));
-            methods.insert(method.name.clone(), value);
+            match method {
+                Stmt::Function(f) => {
+                    let func = RuntimeValue::Function(value::Function::new(
+                        f.params.len(),
+                        f.clone(),
+                        self.env.clone(),
+                        Rc::new(RefCell::new(None)), // Source class will be replaced later
+                        f.name == "init",
+                    ));
+                    methods.insert(f.name.clone(), func);
+                }
+                _ => unreachable!(),
+            }
         }
 
-        let class_value = RuntimeValue::Class(value::Class::new(class.name.clone(), methods));
+        let class_value = RuntimeValue::Class(value::Class::new(
+            class.name.clone(),
+            superclass,
+            Rc::new(RefCell::new(methods)),
+        ));
         let new_env = self.env.borrow().extend(&class.name, class_value)?;
         self.env = Rc::new(RefCell::new(new_env));
+
+        // Replace source_class in methods
+        let class_value = self.env.borrow().get(&class.name)?;
+        let class = match class_value.clone() {
+            RuntimeValue::Class(c) => c,
+            _ => unreachable!(),
+        };
+        for value in class.methods.borrow_mut().values_mut() {
+            let func = match value {
+                RuntimeValue::Function(f) => f,
+                _ => unreachable!(),
+            };
+            func.source_class.replace(Some(class.clone()));
+        }
+
         Ok(())
     }
 
@@ -116,7 +148,8 @@ impl<'a> Interpreter<'a> {
         let func = RuntimeValue::Function(value::Function::new(
             fun.params.len(),
             fun.clone(),
-            self.env.clone(),
+            self.env.clone(), // Closure will be replaced later
+            Rc::new(RefCell::new(None)),
             false,
         ));
         if self.env.borrow().is_global() {
@@ -153,7 +186,7 @@ impl<'a> Interpreter<'a> {
     }
 
     fn execute_return(&mut self, r: &Return) -> Result<(), RuntimeError> {
-        if !self.inside_function {
+        if self.curr_func.is_none() {
             return Err(RuntimeError::CannotReturnFromTopLevel);
         }
         let value = match &r.value {
@@ -196,6 +229,7 @@ impl<'a> Interpreter<'a> {
             Expr::Literal(l) => self.literal(l),
             Expr::Logical(l) => self.logical(l),
             Expr::Set(s) => self.set(s),
+            Expr::Super(s) => self.super_(s),
             Expr::This(t) => self.this(t),
             Expr::Unary(u) => self.unary(u),
             Expr::Variable(v) => self.variable(v),
@@ -341,6 +375,33 @@ impl<'a> Interpreter<'a> {
         }
     }
 
+    fn super_(&mut self, super_: &Super) -> Result<RuntimeValue, RuntimeError> {
+        let curr_function = match &self.curr_func {
+            Some(f) => f,
+            None => return Err(RuntimeError::CantUseSuperOutsideClass),
+        };
+        let func_class = match curr_function.source_class.borrow().clone() {
+            Some(c) => c,
+            None => return Err(RuntimeError::CantUseSuperOutsideClass),
+        };
+        let superclass = match &func_class.superclass {
+            Some(c) => &*c,
+            None => return Err(RuntimeError::CantUseSuperInsideClassWithoutSuperclass),
+        };
+        let method = match superclass.find_method(&super_.method) {
+            Some(RuntimeValue::Function(f)) => f,
+            _ => return Err(RuntimeError::UndefinedProperty(super_.method.clone())),
+        };
+        let this = match self.this(&This) {
+            Ok(v) => match v {
+                RuntimeValue::Instance(i) => i,
+                _ => panic!("this should be an instance"),
+            },
+            Err(e) => return Err(e),
+        };
+        Ok(RuntimeValue::Function(method.bind(this)?))
+    }
+
     fn this(&self, _this: &This) -> Result<RuntimeValue, RuntimeError> {
         match self.env.borrow().get("this") {
             Ok(v) => Ok(v),
@@ -398,6 +459,9 @@ pub enum RuntimeError {
     OnlyInstancesHaveFields,
     CantUseThisOutsideClass,
     CannotReturnInsideInit,
+    SuperclassMustBeClass,
+    CantUseSuperOutsideClass,
+    CantUseSuperInsideClassWithoutSuperclass,
     // Special runtime error for returning values from a function
     ReturnValue(RuntimeValue),
 }
@@ -434,6 +498,15 @@ impl std::fmt::Display for RuntimeError {
             }
             RuntimeError::CannotReturnInsideInit => {
                 write!(f, "Cannot return a value from an initializer.")
+            }
+            RuntimeError::SuperclassMustBeClass => {
+                write!(f, "Superclass must be a class.")
+            }
+            RuntimeError::CantUseSuperOutsideClass => {
+                write!(f, "Can't use 'super' outside of a class.")
+            }
+            RuntimeError::CantUseSuperInsideClassWithoutSuperclass => {
+                write!(f, "Can't use 'super' inside a class without a superclass.")
             }
             RuntimeError::ReturnValue(_) => panic!("Internal error: unhandled return value"),
         }

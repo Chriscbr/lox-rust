@@ -3,7 +3,7 @@ use std::{fmt::Display, io::Write, rc::Rc};
 use crate::{
     ast::{
         Assign, Binary, BinaryOp, Call, Class, Expr, Function, Get, Grouping, If, Literal, Logical,
-        LogicalOp, Print, Return, Set, Stmt, This, Unary, UnaryOp, VarDecl, Variable, While,
+        LogicalOp, Print, Return, Set, Stmt, Super, This, Unary, UnaryOp, VarDecl, Variable, While,
     },
     token::{Token, TokenType},
 };
@@ -69,6 +69,15 @@ impl Parser {
             .lexeme
             .clone();
 
+        let superclass = if self.matches(&[TokenType::Less]) {
+            self.consume(TokenType::Identifier, ParseError::ExpectedSuperclassName)?;
+            Some(Expr::Variable(Variable {
+                name: self.previous().lexeme.clone(),
+            }))
+        } else {
+            None
+        };
+
         self.consume(
             TokenType::LeftBrace,
             ParseError::ExpectedLeftBraceAfterClassName,
@@ -78,10 +87,7 @@ impl Parser {
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
             let method = self.parse_function(FunctionKind::Method);
             match method {
-                Ok(method) => match method {
-                    Stmt::Function(f) => methods.push(f),
-                    _ => unreachable!(),
-                },
+                Ok(m) => methods.push(m),
                 Err(err) => {
                     self.errors.push(err);
                     self.synchronize();
@@ -94,7 +100,11 @@ impl Parser {
             ParseError::ExpectedRightBraceAfterClass,
         )?;
 
-        Ok(Stmt::Class(Class { name, methods }))
+        Ok(Stmt::Class(Class {
+            name,
+            superclass,
+            methods,
+        }))
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, (ParseError, Token)> {
@@ -165,7 +175,7 @@ impl Parser {
         }
 
         body = Stmt::While(While {
-            condition: Box::new(condition),
+            condition: condition,
             body: Box::new(body),
         });
 
@@ -191,7 +201,7 @@ impl Parser {
         };
 
         Ok(Stmt::If(If {
-            condition: Box::new(condition),
+            condition: condition,
             then_branch: Box::new(then_branch),
             else_branch,
         }))
@@ -204,9 +214,7 @@ impl Parser {
             ParseError::ExpectedSemicolonAfterExpression,
         )?;
 
-        Ok(Stmt::Print(Print {
-            expr: Box::new(expr),
-        }))
+        Ok(Stmt::Print(Print { expr }))
     }
 
     fn parse_return_stmt(&mut self) -> Result<Stmt, (ParseError, Token)> {
@@ -236,7 +244,7 @@ impl Parser {
         let body = self.parse_stmt()?;
 
         Ok(Stmt::While(While {
-            condition: Box::new(condition),
+            condition: condition,
             body: Box::new(body),
         }))
     }
@@ -559,6 +567,15 @@ impl Parser {
             return Ok(Expr::Literal(Literal::String(trimmed.to_string())));
         }
 
+        if self.matches(&[TokenType::Super]) {
+            self.consume(TokenType::Dot, ParseError::ExpectedDotAfterSuper)?;
+            let method = self
+                .consume(TokenType::Identifier, ParseError::ExpectedMethodName)?
+                .lexeme
+                .clone();
+            return Ok(Expr::Super(Super { method }));
+        }
+
         if self.matches(&[TokenType::This]) {
             return Ok(Expr::This(This));
         }
@@ -689,6 +706,8 @@ pub enum ParseError {
     ExpectedLeftBraceAfterClassName,
     ExpectedRightBraceAfterClass,
     ExpectedPropertyNameAfterDot,
+    ExpectedSuperclassName,
+    ExpectedDotAfterSuper,
 }
 
 impl Display for ParseError {
@@ -743,6 +762,8 @@ impl Display for ParseError {
             ParseError::ExpectedPropertyNameAfterDot => {
                 "Expected property name after '.'".to_string()
             }
+            ParseError::ExpectedSuperclassName => "Expected superclass name".to_string(),
+            ParseError::ExpectedDotAfterSuper => "Expected '.' after 'super'".to_string(),
         };
         write!(f, "{}", s)
     }

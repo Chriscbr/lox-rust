@@ -52,5 +52,5 @@ class Brunch < Breakfast {
   }
 }
 
-var benedict = Brunch("ham", "English muffin");
+var benedict = Brunch("ham", "English muffin", "mimosa");
 benedict.serve("Noble Reader");

@@ -3,8 +3,9 @@ source: src/main.rs
 expression: contents
 ---
 stdout:
+3
+outside
+Enjoy your breakfast, Dear Reader.
+Enjoy your breakfast, Noble Reader.
 
 stderr:
-[line 44] Error at '<': Expected '{' after class name
-[line 50] Error at 'drink': Expected expression
-[line 53] Error at '}': Expected expression

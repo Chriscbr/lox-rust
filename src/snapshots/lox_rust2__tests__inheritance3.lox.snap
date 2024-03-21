@@ -3,9 +3,6 @@ source: src/main.rs
 expression: contents
 ---
 stdout:
+A method
 
 stderr:
-[line 7] Error at '<': Expected '{' after class name
-[line 11] Error at 'test': Expected expression
-[line 14] Error at '}': Expected expression
-[line 16] Error at '<': Expected '{' after class name

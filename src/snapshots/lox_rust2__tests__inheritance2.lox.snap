@@ -3,7 +3,7 @@ source: src/main.rs
 expression: contents
 ---
 stdout:
+Fry until golden brown.
+Pipe full of custard and coat with chocolate.
 
 stderr:
-[line 7] Error at '<': Expected '{' after class name
-[line 12] Error at '}': Expected expression

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, fmt::Display, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, fmt::Display, rc::Rc};
 
 use super::{env::Environment, Interpreter, RuntimeError};
 
@@ -50,6 +50,7 @@ pub struct Function {
     pub arity: usize,
     pub fun: Rc<ast::Function>,
     pub closure: Rc<RefCell<Environment>>,
+    pub source_class: Rc<RefCell<Option<Class>>>,
     pub is_init: bool,
 }
 
@@ -67,12 +68,14 @@ impl Function {
         arity: usize,
         fun: Rc<ast::Function>,
         closure: Rc<RefCell<Environment>>,
+        source_class: Rc<RefCell<Option<Class>>>,
         is_init: bool,
     ) -> Self {
         Self {
             arity,
             fun,
             closure,
+            source_class,
             is_init,
         }
     }
@@ -92,12 +95,12 @@ impl Function {
             env = Rc::new(RefCell::new(new_env));
         }
 
-        let prev_inside_function = interpreter.inside_function;
-        interpreter.inside_function = true;
+        let prev_curr_func = interpreter.curr_func.clone();
+        interpreter.curr_func = Some(self.clone());
 
         let result = interpreter.execute_block(&self.fun.body, env);
 
-        interpreter.inside_function = prev_inside_function;
+        interpreter.curr_func = prev_curr_func;
 
         if self.is_init {
             match result {
@@ -116,13 +119,13 @@ impl Function {
 
     pub fn bind(&self, instance: Instance) -> Result<Function, RuntimeError> {
         let env = Environment::new(Some(self.closure.clone()));
-        let env = Rc::new(RefCell::new(
-            env.extend("this", RuntimeValue::Instance(instance))?,
-        ));
+        let env = env.extend("this", RuntimeValue::Instance(instance))?;
+        let env = Rc::new(RefCell::new(env));
         Ok(Function {
             arity: self.arity,
             fun: self.fun.clone(),
             closure: env,
+            source_class: self.source_class.clone(),
             is_init: self.is_init,
         })
     }
@@ -131,12 +134,21 @@ impl Function {
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: String,
-    pub methods: HashMap<String, RuntimeValue>,
+    pub superclass: Option<Box<Class>>,
+    pub methods: Rc<RefCell<HashMap<String, RuntimeValue>>>,
 }
 
 impl Class {
-    pub fn new(name: String, methods: HashMap<String, RuntimeValue>) -> Self {
-        Self { name, methods }
+    pub fn new(
+        name: String,
+        superclass: Option<Box<Class>>,
+        methods: Rc<RefCell<HashMap<String, RuntimeValue>>>,
+    ) -> Self {
+        Self {
+            name,
+            superclass,
+            methods,
+        }
     }
 
     pub fn call(
@@ -148,8 +160,9 @@ impl Class {
             return Err(RuntimeError::InvalidArgumentCount);
         }
 
-        let instance = Instance::new(Arc::new(self.clone()));
-        let init = self.methods.get("init");
+        let instance = Instance::new(Rc::new(self.clone()));
+        let methods = self.methods.borrow();
+        let init = methods.get("init");
         if let Some(init) = init {
             if let RuntimeValue::Function(init) = init {
                 let binded_fn = init.bind(instance.clone())?;
@@ -160,11 +173,17 @@ impl Class {
     }
 
     pub fn find_method(&self, name: &str) -> Option<RuntimeValue> {
-        self.methods.get(name).cloned()
+        match self.methods.borrow().get(name) {
+            Some(method) => Some(method.clone()),
+            None => match &self.superclass {
+                Some(superclass) => superclass.find_method(name),
+                None => None,
+            },
+        }
     }
 
     pub fn arity(&self) -> usize {
-        if let Some(RuntimeValue::Function(init)) = self.methods.get("init") {
+        if let Some(RuntimeValue::Function(init)) = self.methods.borrow().get("init") {
             init.arity
         } else {
             0
@@ -174,14 +193,14 @@ impl Class {
 
 #[derive(Debug, Clone)]
 pub struct Instance {
-    pub class: Arc<Class>,
+    pub class: Rc<Class>,
     // hashmap is stored in a Rc/RefCell so that cloning an instance results in a shallow copy
     // if there's a use case for a deep copy, consider adding a separate method for that
     pub fields: Rc<RefCell<HashMap<String, Rc<RefCell<RuntimeValue>>>>>,
 }
 
 impl Instance {
-    pub fn new(class: Arc<Class>) -> Self {
+    pub fn new(class: Rc<Class>) -> Self {
         Self {
             class,
             fields: Rc::new(RefCell::new(HashMap::new())),
