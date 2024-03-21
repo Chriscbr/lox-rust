@@ -135,6 +135,9 @@ impl Function {
 pub struct Class {
     pub name: String,
     pub superclass: Option<Box<Class>>,
+    // hashmap is stored in a Rc/RefCell so that cloning a class results in a shallow copy
+    // in theory a class is rarely cloned, but it's necessary for setting up the source_class
+    // fields on functions during execute_class()
     pub methods: Rc<RefCell<HashMap<String, RuntimeValue>>>,
 }
 
