@@ -1,0 +1,15 @@
+class Bagel {
+    eat() {
+        print "Yum!";
+    }
+}
+
+fun drink() {
+    print "Slurp!";
+}
+
+var Donut = Bagel;
+var myDonut = Donut();
+myDonut.eat(); // Yum!
+myDonut.eat = drink;
+myDonut.eat(); // Slurp!
