@@ -50,7 +50,7 @@ pub struct Function {
     pub arity: usize,
     pub fun: Rc<ast::Function>,
     pub closure: Rc<RefCell<Environment>>,
-    pub source_class: Rc<RefCell<Option<Class>>>,
+    pub source_class: Option<Class>,
     pub is_init: bool,
 }
 
@@ -68,7 +68,7 @@ impl Function {
         arity: usize,
         fun: Rc<ast::Function>,
         closure: Rc<RefCell<Environment>>,
-        source_class: Rc<RefCell<Option<Class>>>,
+        source_class: Option<Class>,
         is_init: bool,
     ) -> Self {
         Self {

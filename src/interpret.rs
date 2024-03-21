@@ -105,7 +105,7 @@ impl<'a> Interpreter<'a> {
                         f.params.len(),
                         f.clone(),
                         self.env.clone(),
-                        Rc::new(RefCell::new(None)), // Source class will be replaced later
+                        None, // Source class will be replaced later
                         f.name == "init",
                     ));
                     methods.insert(f.name.clone(), func);
@@ -133,7 +133,7 @@ impl<'a> Interpreter<'a> {
                 RuntimeValue::Function(f) => f,
                 _ => unreachable!(),
             };
-            func.source_class.replace(Some(class.clone()));
+            func.source_class.replace(class.clone());
         }
 
         Ok(())
@@ -149,7 +149,7 @@ impl<'a> Interpreter<'a> {
             fun.params.len(),
             fun.clone(),
             self.env.clone(), // Closure will be replaced later
-            Rc::new(RefCell::new(None)),
+            None,
             false,
         ));
         if self.env.borrow().is_global() {
@@ -380,7 +380,7 @@ impl<'a> Interpreter<'a> {
             Some(f) => f,
             None => return Err(RuntimeError::CantUseSuperOutsideClass),
         };
-        let func_class = match curr_function.source_class.borrow().clone() {
+        let func_class = match &curr_function.source_class {
             Some(c) => c,
             None => return Err(RuntimeError::CantUseSuperOutsideClass),
         };
