@@ -48,7 +48,11 @@ impl NativeFunction {
 #[derive(Clone)]
 pub struct Function {
     pub arity: usize,
+    // function is stored in an Rc since the AST is immutable and we want to avoid unnecessary cloning
     pub fun: Rc<ast::Function>,
+    // values are wrapped in Rc/RefCell so that cloning the function results in a shallow copy,
+    // where updating a value in one of the function's closures also updates it in the other.
+    // to create a copy of a function with a different environment, use Function::bind()
     pub closure: Rc<RefCell<Environment>>,
     pub source_class: Option<Class>,
     pub is_init: bool,
@@ -134,7 +138,7 @@ impl Function {
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: String,
-    pub superclass: Option<Box<Class>>,
+    pub superclass: Option<Rc<Class>>,
     // hashmap is stored in a Rc/RefCell so that cloning a class results in a shallow copy
     // in theory a class is rarely cloned, but it's necessary for setting up the source_class
     // fields on functions during execute_class()
@@ -144,7 +148,7 @@ pub struct Class {
 impl Class {
     pub fn new(
         name: String,
-        superclass: Option<Box<Class>>,
+        superclass: Option<Rc<Class>>,
         methods: Rc<RefCell<HashMap<String, RuntimeValue>>>,
     ) -> Self {
         Self {

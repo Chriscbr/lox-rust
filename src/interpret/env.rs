@@ -4,6 +4,8 @@ use super::{value::RuntimeValue, RuntimeError};
 
 #[derive(Debug, Clone)]
 pub struct Environment {
+    // values are wrapped in Rc/RefCell so that cloning the environment results in a shallow copy
+    // where updating a value in one of the hashmaps also updates it in the other
     values: HashMap<String, Rc<RefCell<RuntimeValue>>>,
     enclosing: Option<Rc<RefCell<Environment>>>,
 }

@@ -90,7 +90,7 @@ impl<'a> Interpreter<'a> {
         let superclass = if let Some(superclass) = &class.superclass {
             let superclass = self.expr(superclass)?;
             match superclass {
-                RuntimeValue::Class(c) => Some(Box::new(c)),
+                RuntimeValue::Class(c) => Some(Rc::new(c)),
                 _ => return Err(RuntimeError::SuperclassMustBeClass),
             }
         } else {
