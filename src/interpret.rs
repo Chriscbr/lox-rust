@@ -120,7 +120,7 @@ impl<'a> Interpreter<'a> {
             Rc::new(RefCell::new(methods)),
         ));
         let new_env = self.env.borrow().extend(&class.name, class_value)?;
-        self.env = Rc::new(RefCell::new(new_env));
+        self.env = new_env;
 
         // Replace source_class in methods
         let class_value = self.env.borrow().get(&class.name)?;
@@ -158,7 +158,7 @@ impl<'a> Interpreter<'a> {
         }
 
         let new_env = self.env.borrow().extend(&fun.name, func)?;
-        self.env = Rc::new(RefCell::new(new_env));
+        self.env = new_env;
         let func = self.env.borrow().get(&fun.name)?;
         match func {
             RuntimeValue::Function(mut f) => {
@@ -171,7 +171,7 @@ impl<'a> Interpreter<'a> {
 
     fn execute_if(&mut self, i: &If) -> Result<(), RuntimeError> {
         let cond = self.expr(&i.condition)?;
-        if self.is_truthy(&cond) {
+        if cond.is_truthy() {
             self.execute(&i.then_branch)?;
         } else if let Some(else_branch) = &i.else_branch {
             self.execute(else_branch)?;
@@ -206,13 +206,13 @@ impl<'a> Interpreter<'a> {
             return Ok(());
         }
         let new_env = self.env.borrow().extend(&var_decl.name, value)?;
-        self.env = Rc::new(RefCell::new(new_env));
+        self.env = new_env;
         Ok(())
     }
 
     fn execute_while(&mut self, w: &While) -> Result<(), RuntimeError> {
         let mut cond = self.expr(&w.condition)?;
-        while self.is_truthy(&cond) {
+        while cond.is_truthy() {
             self.execute(&w.body)?;
             cond = self.expr(&w.condition)?;
         }
@@ -282,8 +282,8 @@ impl<'a> Interpreter<'a> {
                 }
                 _ => Err(RuntimeError::OperandsMustBeNumbers),
             },
-            BinaryOp::Eq => Ok(RuntimeValue::Bool(self.is_equal(&left, &right))),
-            BinaryOp::NotEq => Ok(RuntimeValue::Bool(!self.is_equal(&left, &right))),
+            BinaryOp::Eq => Ok(RuntimeValue::Bool(left.eq(&right))),
+            BinaryOp::NotEq => Ok(RuntimeValue::Bool(!left.eq(&right))),
             BinaryOp::Lt => match (left, right) {
                 (RuntimeValue::Number(l), RuntimeValue::Number(r)) => Ok(RuntimeValue::Bool(l < r)),
                 _ => Err(RuntimeError::OperandsMustBeNumbers),
@@ -349,12 +349,12 @@ impl<'a> Interpreter<'a> {
 
         match logical.op {
             LogicalOp::And => {
-                if !self.is_truthy(&left) {
+                if !left.is_truthy() {
                     return Ok(left);
                 }
             }
             LogicalOp::Or => {
-                if self.is_truthy(&left) {
+                if left.is_truthy() {
                     return Ok(left);
                 }
             }
@@ -418,30 +418,12 @@ impl<'a> Interpreter<'a> {
                 RuntimeValue::Number(n) => Ok(RuntimeValue::Number(-n)),
                 _ => Err(RuntimeError::OperandMustBeNumber),
             },
-            UnaryOp::Not => Ok(RuntimeValue::Bool(!self.is_truthy(&right))),
+            UnaryOp::Not => Ok(RuntimeValue::Bool(!right.is_truthy())),
         }
     }
 
     fn variable(&self, variable: &Variable) -> Result<RuntimeValue, RuntimeError> {
         self.env.borrow().get(&variable.name)
-    }
-
-    fn is_truthy(&self, value: &RuntimeValue) -> bool {
-        match value {
-            RuntimeValue::Nil => false,
-            RuntimeValue::Bool(b) => *b,
-            _ => true,
-        }
-    }
-
-    fn is_equal(&self, a: &RuntimeValue, b: &RuntimeValue) -> bool {
-        match (a, b) {
-            (RuntimeValue::Nil, RuntimeValue::Nil) => true,
-            (RuntimeValue::Number(l), RuntimeValue::Number(r)) => l == r,
-            (RuntimeValue::String(l), RuntimeValue::String(r)) => l == r,
-            (RuntimeValue::Bool(l), RuntimeValue::Bool(r)) => l == r,
-            _ => false,
-        }
     }
 }
 

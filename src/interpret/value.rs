@@ -16,6 +16,28 @@ pub enum RuntimeValue {
     Instance(Instance),
 }
 
+impl RuntimeValue {
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            RuntimeValue::Nil => false,
+            RuntimeValue::Bool(b) => *b,
+            _ => true,
+        }
+    }
+}
+
+impl PartialEq for RuntimeValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (RuntimeValue::Nil, RuntimeValue::Nil) => true,
+            (RuntimeValue::Number(l), RuntimeValue::Number(r)) => l == r,
+            (RuntimeValue::String(l), RuntimeValue::String(r)) => l == r,
+            (RuntimeValue::Bool(l), RuntimeValue::Bool(r)) => l == r,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct NativeFunction {
     pub arity: usize,
@@ -50,7 +72,7 @@ pub struct Function {
     pub arity: usize,
     // function is stored in an Rc since the AST is immutable and we want to avoid unnecessary cloning
     pub fun: Rc<ast::Function>,
-    // values are wrapped in Rc/RefCell so that cloning the function results in a shallow copy,
+    // closure is wrapped in Rc/RefCell so that cloning the function results in a shallow copy,
     // where updating a value in one of the function's closures also updates it in the other.
     // to create a copy of a function with a different environment, use Function::bind()
     pub closure: Rc<RefCell<Environment>>,
@@ -96,7 +118,7 @@ impl Function {
         let mut env = Rc::new(RefCell::new(Environment::new(Some(self.closure.clone()))));
         for (i, param) in self.fun.params.iter().enumerate() {
             let new_env = env.borrow().extend(param, args[i].clone())?;
-            env = Rc::new(RefCell::new(new_env));
+            env = new_env;
         }
 
         let prev_curr_func = interpreter.curr_func.clone();
@@ -124,7 +146,6 @@ impl Function {
     pub fn bind(&self, instance: Instance) -> Result<Function, RuntimeError> {
         let env = Environment::new(Some(self.closure.clone()));
         let env = env.extend("this", RuntimeValue::Instance(instance))?;
-        let env = Rc::new(RefCell::new(env));
         Ok(Function {
             arity: self.arity,
             fun: self.fun.clone(),

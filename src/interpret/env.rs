@@ -4,8 +4,11 @@ use super::{value::RuntimeValue, RuntimeError};
 
 #[derive(Debug, Clone)]
 pub struct Environment {
-    // values are wrapped in Rc/RefCell so that cloning the environment results in a shallow copy
-    // where updating a value in one of the hashmaps also updates it in the other
+    // `values` is wrapped in Rc/RefCell so that cloning the environment results in a shallow copy
+    // where updating a value in one of the hashmaps also updates it in the other.
+    // Methods ensure that the values can be reassigned (for example, when a variable is reassigned
+    // or an instance field is reassigned), but entries in the hashmap are never added or removed
+    // except by creating a copied environment with Environment::extend().
     values: HashMap<String, Rc<RefCell<RuntimeValue>>>,
     enclosing: Option<Rc<RefCell<Environment>>>,
 }
@@ -18,7 +21,11 @@ impl Environment {
         }
     }
 
-    pub fn extend(&self, name: &str, value: RuntimeValue) -> Result<Environment, RuntimeError> {
+    pub fn extend(
+        &self,
+        name: &str,
+        value: RuntimeValue,
+    ) -> Result<Rc<RefCell<Environment>>, RuntimeError> {
         if self.values.contains_key(name) {
             return Err(RuntimeError::AlreadyDefined(name.to_string()));
         }
@@ -26,7 +33,7 @@ impl Environment {
         new_env
             .values
             .insert(name.to_string(), Rc::new(RefCell::new(value)));
-        Ok(new_env)
+        Ok(Rc::new(RefCell::new(new_env)))
     }
 
     pub fn get(&self, name: &str) -> Result<RuntimeValue, RuntimeError> {
