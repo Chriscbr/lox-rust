@@ -10,3 +10,9 @@ This does result in some minor differences, as errors around variable initializa
 I didn't get a chance to test the implementation against the entire Lox test suite (https://github.com/munificent/craftinginterpreters/tree/master/test) but I did add a decent number of my own tests to ensure a lot of the tricky edge cases around recursion and closures are handled.
 
 See <https://github.com/munificent/craftinginterpreters/wiki/Lox-implementations> if you're interested in checking out other implementations of Lox.
+
+## Usage
+
+```
+cargo run examples/fibonacci.lox
+```

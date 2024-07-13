@@ -26,7 +26,7 @@ impl<'a> Interpreter<'a> {
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
-                        .as_secs_f64(),
+                        .as_millis() as f64,
                 ))
             })),
         );
